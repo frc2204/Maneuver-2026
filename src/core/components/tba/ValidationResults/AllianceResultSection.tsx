@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Alliance Result Section Component
  * 

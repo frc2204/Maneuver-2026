@@ -8,10 +8,9 @@ import {
   MapPin,
   Bug,
   CheckCircle,
-  FlaskConical,
 } from 'lucide-react';
 
-export type TBADataType = 'match-data' | 'match-results' | 'match-validation-data' | 'event-teams' | 'pit-data' | 'debug-nexus' | 'validation-testing';
+export type TBADataType = 'match-data' | 'match-results' | 'match-validation-data' | 'event-teams' | 'pit-data' | 'debug-nexus';
 
 interface DataTypeSelectorProps {
   dataType: TBADataType;
@@ -48,12 +47,6 @@ const dataTypeOptions = [
     label: 'Pit Data',
     icon: MapPin,
     description: 'Download pit assignments and map from Nexus'
-  },
-  {
-    value: 'validation-testing' as const,
-    label: 'Validation Testing',
-    icon: FlaskConical,
-    description: 'Test match validation system with scouted and TBA data'
   },
   {
     value: 'debug-nexus' as const,

@@ -19,10 +19,10 @@ import AutoScoringPage from "@/core/pages/AutoScoringPage";
 import TeleopScoringPage from "@/core/pages/TeleopScoringPage";
 import EndgamePage from "@/core/pages/EndgamePage";
 import { PitScoutingPage } from "@/core/pages/PitScoutingPage";
+import APIDataPage from "@/core/pages/tba/APIDataPage";
 // GAME-SPECIFIC: Uncomment and implement these in your game implementation
 // import AutoStartPage from "@/pages/AutoStartPage";
 // import ParseDataPage from "@/pages/ParseDataPage";
-// import APIDataPage from "@/pages/APIDataPage";
 // import ClearDataPage from "@/pages/ClearDataPage";
 // import QRDataTransferPage from "@/pages/QRDataTransferPage";
 // import JSONDataTransferPage from "@/pages/JSONDataTransferPage";
@@ -63,9 +63,9 @@ function App() {
         <Route path="/endgame" element={<EndgamePage />} />
         <Route path="/clear-data" element={<ClearDataPage />} />
         <Route path="/pit-scouting" element={<PitScoutingPage />} />
+        <Route path="/api-data" element={<APIDataPage />} />
         
         {/* GAME-SPECIFIC ROUTES: Uncomment and implement these in your game implementation */}
-        {/* <Route path="/api-data" element={<APIDataPage />} /> */}
         {/* <Route path="/parse-data" element={<ParseDataPage />} /> */}
         {/* <Route path="/qr-data-transfer" element={<QRDataTransferPage />} /> */}
         {/* <Route path="/json-transfer" element={<JSONDataTransferPage />} /> */}

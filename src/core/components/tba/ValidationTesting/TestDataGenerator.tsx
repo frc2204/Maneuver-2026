@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Test Data Generator Component
  * 

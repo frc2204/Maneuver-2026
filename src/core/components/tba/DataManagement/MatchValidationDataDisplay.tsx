@@ -48,6 +48,36 @@ export function MatchValidationDataDisplay({
   const playoffMatches = matches.filter(m => m.comp_level !== 'qm');
   const matchesWithBreakdown = matches.filter(hasScoreBreakdown).length;
   
+  // Extract available validation fields from score breakdown
+  // This is year-agnostic - it automatically detects what data is available
+  const getAvailableFields = (): string[] => {
+    const matchWithBreakdown = matches.find(m => m.score_breakdown);
+    if (!matchWithBreakdown || !matchWithBreakdown.score_breakdown) return [];
+    
+    const breakdown = matchWithBreakdown.score_breakdown;
+    const redAlliance = breakdown.red || {};
+    
+    // Get all top-level keys from the score breakdown
+    return Object.keys(redAlliance).filter(key => {
+      // Filter out non-field data (metadata, computed totals, etc.)
+      const metadataKeys = [
+        'rp', 'totalPoints', 'foulPoints', 'adjustPoints', 
+        'foulCount', 'techFoulCount', 'tba_gameData'
+      ];
+      return !metadataKeys.includes(key);
+    });
+  };
+  
+  const availableFields = getAvailableFields();
+  
+  // Format field name for display (camelCase to Title Case)
+  const formatFieldName = (field: string): string => {
+    return field
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  };
+  
   return (
     <Card>
       <CardHeader>
@@ -145,53 +175,26 @@ export function MatchValidationDataDisplay({
             
             <Separator />
             
-            {/* Available Data Fields */}
+            {/* Available Data Fields - Year-Agnostic */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium">Available Validation Fields</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Coral Placement</p>
-                    <p className="text-xs text-muted-foreground">By level (L1-L4), auto & teleop</p>
-                  </div>
+              {availableFields.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {availableFields.map(field => (
+                    <div key={field} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-medium">{formatFieldName(field)}</p>
+                        <p className="text-xs text-muted-foreground">From TBA score breakdown</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Algae Scoring</p>
-                    <p className="text-xs text-muted-foreground">Net shots & processor</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Auto Line Crossings</p>
-                    <p className="text-xs text-muted-foreground">Per robot (0-3)</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Endgame Status</p>
-                    <p className="text-xs text-muted-foreground">Deep, shallow, park per robot</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Penalties</p>
-                    <p className="text-xs text-muted-foreground">Fouls & tech fouls</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="font-medium">Bonuses</p>
-                    <p className="text-xs text-muted-foreground">Auto, coral, barge bonuses</p>
-                  </div>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Score breakdown fields will appear here when match data is loaded
+                </p>
+              )}
             </div>
             
             <Separator />

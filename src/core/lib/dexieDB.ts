@@ -900,18 +900,17 @@ export const createMatchPrediction = async (
 
   await gameDB.predictions.put(prediction);
 
-  const scout = await gameDB.scouts.get(scoutName);
-  if (scout) {
-    scout.totalPredictions += 1;
-    scout.lastUpdated = Date.now();
-    await gameDB.scouts.put(scout);
-    
-    const { checkForNewAchievements } = await import('./achievementUtils');
-    const newAchievements = await checkForNewAchievements(scoutName);
-    
-    if (newAchievements.length > 0) {
-      console.log('🏆 New achievements unlocked for', scoutName, ':', newAchievements.map(a => a.name));
-    }
+  // Ensure scout exists and update their stats
+  const scout = await getOrCreateScout(scoutName);
+  scout.totalPredictions += 1;
+  scout.lastUpdated = Date.now();
+  await gameDB.scouts.put(scout);
+  
+  const { checkForNewAchievements } = await import('./achievementUtils');
+  const newAchievements = await checkForNewAchievements(scoutName);
+  
+  if (newAchievements.length > 0) {
+    console.log('🏆 New achievements unlocked for', scoutName, ':', newAchievements.map(a => a.name));
   }
 
   return prediction;

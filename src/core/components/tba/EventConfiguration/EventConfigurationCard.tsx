@@ -1,9 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/core/components/ui/card";
-import { Input } from "@/core/components/ui/input";
 import { Button } from "@/core/components/ui/button";
 import { Badge } from "@/core/components/ui/badge";
 import { Alert, AlertDescription } from "@/core/components/ui/alert";
+import { EventNameSelector } from "@/core/components/GameStartComponents/EventNameSelector";
 import { 
   Calendar,
   Trash2,
@@ -48,18 +48,16 @@ export const EventConfigurationCard: React.FC<EventConfigurationCardProps> = ({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Event Key Input */}
+          {/* Event Key Selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Event Key</label>
-            <Input
-              id="eventKey"
-              placeholder="e.g., 2024chcmp, 2024week0"
-              value={eventKey}
-              onChange={(e) => setEventKey(e.target.value)}
-              className="w-full"
+            <EventNameSelector
+              currentEventName={eventKey}
+              onEventNameChange={setEventKey}
+              showCustomEvents={false}
             />
             <p className="text-xs text-muted-foreground">
-              Event keys can be found on The Blue Alliance event pages
+              Select from official 2026 FRC events
             </p>
           </div>
 

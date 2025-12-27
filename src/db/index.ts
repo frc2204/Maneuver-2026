@@ -117,3 +117,11 @@ export {
   migrateScoutingMetadata,
   runStartupMigrations,
 } from '../core/db/migrationUtils';
+
+// Scout gamification utilities
+export {
+  STAKE_VALUES,
+  calculateStreakBonus,
+  updateScoutWithPredictionResult,
+  calculateAccuracy,
+} from '../core/db/scoutGameUtils';

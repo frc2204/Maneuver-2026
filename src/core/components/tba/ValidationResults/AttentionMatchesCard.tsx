@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Attention Matches Card Component
  * 

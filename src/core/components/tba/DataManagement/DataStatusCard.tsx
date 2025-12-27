@@ -2,9 +2,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card";
 import { Badge } from "@/core/components/ui/badge";
 import { CheckCircle, XCircle, Database, Calendar, Users, MapPin, AlertTriangle, ShieldCheck } from 'lucide-react';
-import { getStoredPitAddresses, getStoredPitData, getStoredNexusTeams } from '@/core/lib/nexusUtils';
-import { getAllStoredEventTeams } from '@/core/lib/tbaUtils';
+import { getStoredPitAddresses, getStoredPitData, getStoredNexusTeams, getAllStoredEventTeams } from '@/core/lib/tba';
 import { getCachedTBAEventMatches, getCacheExpiration } from '@/core/lib/tbaCache';
+import { gameDB } from '@/core/lib/dexieDB';
 
 interface DataStatusCardProps {
   eventKey: string;
@@ -25,6 +25,11 @@ export const DataStatusCard: React.FC<DataStatusCardProps> = ({
     count: number;
     isExpired: boolean;
   } | null>(null);
+
+  const [verifiedPredictions, setVerifiedPredictions] = React.useState<{
+    count: number;
+    matchCount: number;
+  }>({ count: 0, matchCount: 0 });
 
   // Check validation data cache
   React.useEffect(() => {
@@ -51,6 +56,38 @@ export const DataStatusCard: React.FC<DataStatusCardProps> = ({
     checkValidationData();
   }, [eventKey]);
 
+  // Check verified predictions from database
+  React.useEffect(() => {
+    if (!eventKey.trim()) {
+      setVerifiedPredictions({ count: 0, matchCount: 0 });
+      return;
+    }
+
+    const checkVerifiedPredictions = async () => {
+      try {
+        // Get all predictions for this event that are verified
+        const allPredictions = await gameDB.predictions
+          .where('eventName')
+          .equals(eventKey)
+          .and(p => p.verified === true)
+          .toArray();
+        
+        // Count unique matches
+        const uniqueMatches = new Set(allPredictions.map(p => p.matchNumber));
+        
+        setVerifiedPredictions({
+          count: allPredictions.length,
+          matchCount: uniqueMatches.size
+        });
+      } catch (error) {
+        console.error('Error checking verified predictions:', error);
+        setVerifiedPredictions({ count: 0, matchCount: 0 });
+      }
+    };
+
+    checkVerifiedPredictions();
+  }, [eventKey]);
+
   if (!eventKey.trim()) {
     return (
       <Card>
@@ -73,15 +110,14 @@ export const DataStatusCard: React.FC<DataStatusCardProps> = ({
   // Check various data sources
   const hasMatchData = localStorage.getItem('matchData') !== null && localStorage.getItem('matchData') !== '';
   
-  // Check for stakes awarded (indicates prediction processing has occurred)
-  const stakesKeys = Object.keys(localStorage).filter(key => key.startsWith(`stakesAwarded_${eventKey}_`));
-  const hasStakesAwarded = stakesKeys.length > 0;
-  const stakesProcessedMatches = stakesKeys.length;
+  // Use verified predictions from database instead of localStorage
+  const hasVerifiedPredictions = verifiedPredictions.count > 0;
+  const verifiedMatchCount = verifiedPredictions.matchCount;
   
   // Check TBA teams
   const tbaTeams = getAllStoredEventTeams();
   const hasTBATeams = tbaTeams[eventKey] && tbaTeams[eventKey].length > 0;
-  const tbaTeamCount = hasTBATeams ? tbaTeams[eventKey].length : 0;
+  const tbaTeamCount = hasTBATeams ? (tbaTeams[eventKey]?.length || 0) : 0;
   
   // Check Nexus teams
   const nexusTeams = getStoredNexusTeams(eventKey);
@@ -154,9 +190,11 @@ export const DataStatusCard: React.FC<DataStatusCardProps> = ({
     },
     {
       label: 'Prediction Processing',
-      status: hasStakesAwarded ? 'loaded' : 'empty',
-      count: stakesProcessedMatches,
-      details: hasStakesAwarded ? 'Stakes awarded to scouts' : 'No predictions processed yet',
+      status: hasVerifiedPredictions ? 'loaded' : 'empty',
+      count: verifiedMatchCount,
+      details: hasVerifiedPredictions 
+        ? `${verifiedPredictions.count} predictions verified across ${verifiedMatchCount} matches`
+        : 'No predictions processed yet',
       icon: CheckCircle
     },
     {

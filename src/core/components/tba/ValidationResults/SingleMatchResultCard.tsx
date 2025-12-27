@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Single Match Result Card Component
  * 

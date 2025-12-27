@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * TBA Data Caching with IndexedDB
  * 

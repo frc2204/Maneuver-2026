@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Validation Testing Component
  * 

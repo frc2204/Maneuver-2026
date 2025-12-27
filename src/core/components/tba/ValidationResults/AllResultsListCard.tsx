@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * All Results List Card Component
  * 

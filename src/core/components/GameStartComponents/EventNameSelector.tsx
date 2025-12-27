@@ -60,9 +60,17 @@ interface Event2026 {
 interface EventNameSelectorProps {
   currentEventName: string
   onEventNameChange: (eventName: string) => void
+  showCustomEvents?: boolean // Optional prop to hide custom event functionality
 }
 
-export function EventNameSelector({ currentEventName, onEventNameChange }: EventNameSelectorProps) {
+export function EventNameSelector({ 
+  currentEventName, 
+  onEventNameChange,
+  showCustomEvents = true // Default to true for backward compatibility
+}: EventNameSelectorProps) {
+  // In development mode, always show custom events for testing
+  const isDev = import.meta.env.DEV;
+  const allowCustomEvents = showCustomEvents || isDev;
   const [open, setOpen] = useState(false)
   const [customEvents, setCustomEvents] = useState<string[]>([])
   const [newEventName, setNewEventName] = useState("")
@@ -159,20 +167,22 @@ export function EventNameSelector({ currentEventName, onEventNameChange }: Event
           <CommandEmpty>
             <div className="text-center p-4">
               <p className="text-sm text-muted-foreground mb-2">No events found</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddForm(true)}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Event
-              </Button>
+              {allowCustomEvents && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Event
+                </Button>
+              )}
             </div>
           </CommandEmpty>
           <CommandList>
             {/* Add New Custom Event - At Top */}
-            {!showAddForm && (
+            {allowCustomEvents && !showAddForm && (
               <CommandGroup>
                 <CommandItem onSelect={() => setShowAddForm(true)}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -181,7 +191,7 @@ export function EventNameSelector({ currentEventName, onEventNameChange }: Event
               </CommandGroup>
             )}
             
-            {showAddForm && (
+            {allowCustomEvents && showAddForm && (
               <CommandGroup>
                 <div className="p-2 space-y-2">
                   <Input
@@ -257,7 +267,7 @@ export function EventNameSelector({ currentEventName, onEventNameChange }: Event
             </CommandGroup>
             
             {/* Custom Events */}
-            {customEvents.length > 0 && (
+            {allowCustomEvents && customEvents.length > 0 && (
               <CommandGroup heading="Custom Events">
                 {customEvents.map((eventKey) => (
                   <CommandItem

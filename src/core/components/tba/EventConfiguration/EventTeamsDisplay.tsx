@@ -10,8 +10,7 @@ import {
   AlertCircle,
   MapPin,
 } from 'lucide-react';
-import { type TBATeam } from '@/core/lib/tbaUtils';
-import { hasStoredNexusTeams } from '@/core/lib/nexusUtils';
+import { type TBATeam, hasStoredNexusTeams } from '@/core/lib/tba';
 
 interface EventTeamsDisplayProps {
   teams: TBATeam[];

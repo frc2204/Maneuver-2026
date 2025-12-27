@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { type TBAMatch, getMatchResult } from '@/core/lib/tbaUtils';
-import { setCurrentEvent } from '@/core/lib/eventDataUtils';
 import { 
-  getEventTeams, 
-  storeEventTeams, 
-  getStoredEventTeams, 
+  type TBAMatch, 
+  type TBATeam,
+  getMatchResult,
+  getEventTeams,
+  storeEventTeams,
+  getStoredEventTeams,
   clearStoredEventTeams,
-  type TBATeam 
-} from '@/core/lib/tbaUtils';
+  setCurrentEvent
+} from '@/core/lib/tba';
 
 export const useTBAData = () => {
   // Match Data Loading state
