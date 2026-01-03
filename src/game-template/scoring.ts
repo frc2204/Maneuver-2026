@@ -16,17 +16,20 @@ export interface GameData {
         startPosition: number | null;
         action1Count: number;
         action2Count: number;
-        mobility: boolean;
+        action3Count: number;
+        action4Count: number;
     };
     teleop: {
         action1Count: number;
         action2Count: number;
-        scoreAmplified?: boolean; // Example of a boolean flag
+        action3Count: number;
     };
     endgame: {
-        success: boolean;
-        park: boolean;
-        failed?: boolean;
+        option1: boolean;
+        option2: boolean;
+        option3: boolean;
+        toggle1: boolean;
+        toggle2: boolean;
     };
     [key: string]: unknown;
 }
@@ -41,24 +44,30 @@ export interface ScoutingEntry extends ScoutingEntryBase {
 export const scoringCalculations: ScoringCalculations<ScoutingEntry> = {
     calculateAutoPoints(entry) {
         const gameData = entry.gameData as GameData;
-        const action1Points = (gameData?.auto?.action1Count || 0) * AUTO_POINTS.ACTION_1;
-        const action2Points = (gameData?.auto?.action2Count || 0) * AUTO_POINTS.ACTION_2;
-        const mobilityPoints = gameData?.auto?.mobility ? AUTO_POINTS.MOBILITY : 0;
-        return action1Points + action2Points + mobilityPoints;
+        return (
+            (gameData?.auto?.action1Count || 0) * AUTO_POINTS.ACTION_1 +
+            (gameData?.auto?.action2Count || 0) * AUTO_POINTS.ACTION_2 +
+            (gameData?.auto?.action3Count || 0) * AUTO_POINTS.ACTION_3 +
+            (gameData?.auto?.action4Count || 0) * AUTO_POINTS.ACTION_4
+        );
     },
 
     calculateTeleopPoints(entry) {
         const gameData = entry.gameData as GameData;
-        const action1Points = (gameData?.teleop?.action1Count || 0) * TELEOP_POINTS.ACTION_1;
-        const action2Points = (gameData?.teleop?.action2Count || 0) * TELEOP_POINTS.ACTION_2;
-        return action1Points + action2Points;
+        return (
+            (gameData?.teleop?.action1Count || 0) * TELEOP_POINTS.ACTION_1 +
+            (gameData?.teleop?.action2Count || 0) * TELEOP_POINTS.ACTION_2 +
+            (gameData?.teleop?.action3Count || 0) * TELEOP_POINTS.ACTION_3
+        );
     },
 
     calculateEndgamePoints(entry) {
         const gameData = entry.gameData as GameData;
-        if (gameData?.endgame?.success) return ENDGAME_POINTS.SUCCESS;
-        if (gameData?.endgame?.park) return ENDGAME_POINTS.PARK;
-        return 0;
+        let points = 0;
+        if (gameData?.endgame?.option1) points += ENDGAME_POINTS.OPTION_1;
+        if (gameData?.endgame?.option2) points += ENDGAME_POINTS.OPTION_2;
+        if (gameData?.endgame?.option3) points += ENDGAME_POINTS.OPTION_3;
+        return points;
     },
 
     calculateTotalPoints(entry) {

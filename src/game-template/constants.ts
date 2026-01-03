@@ -8,17 +8,22 @@
 export const AUTO_POINTS = {
     ACTION_1: 3,
     ACTION_2: 5,
-    MOBILITY: 3,
+    ACTION_3: 2,
+    ACTION_4: 4,
 } as const;
 
 export const TELEOP_POINTS = {
     ACTION_1: 2,
     ACTION_2: 4,
+    ACTION_3: 3,
 } as const;
 
 export const ENDGAME_POINTS = {
-    SUCCESS: 10,
-    PARK: 2,
+    OPTION_1: 10,
+    OPTION_2: 5,
+    OPTION_3: 2,
+    TOGGLE_1: 0,
+    TOGGLE_2: 0,
 } as const;
 
 export const PENALTY_POINTS = {

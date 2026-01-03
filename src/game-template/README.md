@@ -10,6 +10,7 @@ game-template/
 ├── analysis.ts          # Logic for defining stats, rates, and badges
 ├── constants.ts         # Scoring constants (point values)
 ├── scoring.ts           # Scoring calculation logic (functions to compute points)
+├── strategy-config.ts   # Strategy Overview page configuration (columns, presets, aggregates)
 ├── transformation.ts    # Logic to transform raw match data into db-ready counters
 ```
 
@@ -24,7 +25,27 @@ Maneuver uses a generic `ScoutingEntry`. This file defines how to take the raw a
 ### 3. Analysis & Display (`analysis.ts`)
 Defines "Stat Cards" and "Rate Cards" for the Team Stats page. You define the *metadata* here (titles, labels, colors), and the UI will render them.
 
-### 4. Components (`components/`)
+### 4. Strategy Configuration (`strategy-config.ts`)
+Configures the **Strategy Overview** page with team statistics table and charts. This file defines:
+
+- **`columns`**: Array of column configurations for the team stats table
+  - `key`: Data path (e.g., `"auto.action1Count"`, `"totalPoints"`)
+  - `label`: Display name shown in the table header
+  - `category`: Grouping for the column settings sheet (e.g., "Auto", "Teleop", "Endgame")
+  - `visible`: Whether the column is shown by default
+  - `numeric`: Whether the column contains numeric data (enables filtering/sorting)
+  - `percentage`: Whether to display as a percentage
+
+- **`presets`**: Named column visibility presets (e.g., "essential", "auto-focused", "endgame")
+
+- **`aggregates`**: Custom calculation functions for derived metrics like `totalPoints`, `autoPoints`, etc.
+
+Example column definition:
+```typescript
+{ key: "auto.action1Count", label: "Auto Coral L4", category: "Auto", visible: true, numeric: true }
+```
+
+### 5. Components (`components/`)
 Contains the React components that need to change year-over-year, such as:
 *   **Field Selector**: For choosing auto start positions.
 *   **Pit Questions**: For the specific pit scouting form.

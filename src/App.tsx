@@ -19,7 +19,7 @@ import AutoScoringPage from "@/core/pages/AutoScoringPage";
 import TeleopScoringPage from "@/core/pages/TeleopScoringPage";
 import EndgamePage from "@/core/pages/EndgamePage";
 import { PitScoutingPage } from "@/core/pages/PitScoutingPage";
-import APIDataPage from "@/core/pages/tba/APIDataPage";
+import APIDataPage from "@/core/pages/APIDataPage";
 import JSONDataTransferPage from "@/core/pages/JSONDataTransferPage";
 // GAME-SPECIFIC: Uncomment and implement these in your game implementation
 // import AutoStartPage from "@/pages/AutoStartPage";
@@ -33,10 +33,8 @@ import JSONDataTransferPage from "@/core/pages/JSONDataTransferPage";
 // import { AutoScoringPage, TeleopScoringPage } from "@/pages/ScoringPage";
 // import EndgamePage from "@/pages/EndgamePage";
 import TeamStatsPage from "@/core/pages/TeamStatsPage";
+import StrategyOverviewPage from "@/core/pages/StrategyOverviewPage";
 // import PitScoutingPage from "@/pages/PitScoutingPage";
-// import PitAssignmentsPage from "@/pages/PitAssignmentsPage";
-// import PickListPage from "./pages/PickListPage";
-// import StrategyOverviewPage from "./pages/StrategyOverviewPage";
 // import ScoutManagementDashboardPage from "./pages/ScoutManagementDashboardPage";
 // import AchievementsPage from "./pages/AchievementsPage";
 // import DevUtilitiesPage from "./pages/DevUtilitiesPage";
@@ -101,9 +99,8 @@ function App() {
         {/* <Route path="/teleop-scoring" element={<TeleopScoringPage />} /> */}
         {/* <Route path="/endgame" element={<EndgamePage />} /> */}
         <Route path="/team-stats" element={<TeamStatsPage />} />
-        {/* <Route path="/pit-scouting" element={<PitScoutingPage />} /> */}
-        {/* <Route path="/pit-assignments" element={<PitAssignmentsPage />} /> */}
-        {/* <Route path="/strategy-overview" element={<StrategyOverviewPage />} /> */}
+        <Route path="/strategy-overview" element={<StrategyOverviewPage />} />
+        {/* <Route path="/pit-scouting" element={<PitScoutingPage />} /> 
         {/* <Route path="/pick-list" element={<PickListPage />} /> */}
         {/* <Route path="/match-validation" element={<MatchValidationPage />} /> */}
         {/* <Route path="/scout-management" element={<ScoutManagementDashboardPage />} /> */}
