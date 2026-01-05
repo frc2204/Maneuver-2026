@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
-import fieldImage from "@/assets/field.png";
+import { CANVAS_CONSTANTS } from "../lib/canvasConstants";
+import { drawTeamNumbers } from "../lib/canvasUtils";
 
-// Constants for team label positioning and sizing
-const TEAM_LABEL_FONT_SIZE_RATIO = 0.02; // Font size as ratio of canvas width
-const BLUE_ALLIANCE_X_POSITION = 0.03; // Left edge position for blue alliance
-const RED_ALLIANCE_X_POSITION = 0.97; // Right edge position for red alliance
-const TEAM_POSITION_TOP_Y = 0.275; // Y position for top team slot
-const TEAM_POSITION_MIDDLE_Y = 0.505; // Y position for middle team slot
-const TEAM_POSITION_BOTTOM_Y = 0.735; // Y position for bottom team slot
-
-// Constants for canvas layout and spacing
-const MOBILE_RESERVED_WIDTH_FOR_CONTROLS = 160; // Reserved width on mobile for vertical floating control bar (includes buttons + margins)
-
-// Global reference for background image to share with drawing hook
+// Global reference for background image (no longer needed for erasing, but kept for compatibility)
 let globalBackgroundImage: HTMLImageElement | null = null;
 
 export const getGlobalBackgroundImage = () => globalBackgroundImage;
@@ -21,202 +11,166 @@ export const setGlobalBackgroundImage = (img: HTMLImageElement) => {
 };
 
 interface UseCanvasSetupProps {
+  fieldImagePath: string;
   currentStageId: string;
   isFullscreen: boolean;
   hideControls: boolean;
   isMobile: boolean;
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  // Multi-layer canvas refs
+  backgroundCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  drawingCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   fullscreenRef: React.RefObject<HTMLDivElement | null>;
   selectedTeams?: string[];
   onCanvasReady?: () => void;
+  onDimensionsChange?: (dimensions: { width: number; height: number }) => void;
 }
 
 export const useCanvasSetup = ({
+  fieldImagePath,
   currentStageId,
   isFullscreen,
   hideControls,
   isMobile,
-  canvasRef,
+  backgroundCanvasRef,
+  overlayCanvasRef,
+  drawingCanvasRef,
   containerRef,
   fullscreenRef,
   selectedTeams = [],
-  onCanvasReady
+  onCanvasReady,
+  onDimensionsChange
 }: UseCanvasSetupProps) => {
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
   const setupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const drawTeamNumbersOnCanvas = useCallback((ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
-    // Only draw team numbers if exactly 6 teams are selected (3 per alliance)
-    if (!selectedTeams || selectedTeams.length !== 6) return;
-    
-    // Set text style using defined font size ratio
-    const fontSize = Math.floor(canvasWidth * TEAM_LABEL_FONT_SIZE_RATIO);
-    ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Blue alliance (left side with blue hexagon) - positions 3, 4, 5
-    const blueX = canvasWidth * BLUE_ALLIANCE_X_POSITION;
-    const blueTeams = [
-      { team: selectedTeams[3], y: canvasHeight * TEAM_POSITION_TOP_Y }, // Position 1 at top
-      { team: selectedTeams[4], y: canvasHeight * TEAM_POSITION_MIDDLE_Y }, // Position 2 at middle
-      { team: selectedTeams[5], y: canvasHeight * TEAM_POSITION_BOTTOM_Y }, // Position 3 at bottom
-    ];
-    
-    blueTeams.forEach(({ team, y }) => {
-      if (team && team.trim()) {
-        ctx.save();
-        ctx.translate(blueX, y);
-        ctx.rotate(Math.PI / 2);
-        
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.strokeText(team, 0, 0);
-        ctx.fillText(team, 0, 0);
-        
-        ctx.restore();
-      }
-    });
-    
-    // Red alliance (right side with red hexagon) - positions 0, 1, 2
-    const redX = canvasWidth * RED_ALLIANCE_X_POSITION;
-    const redTeams = [
-      { team: selectedTeams[0], y: canvasHeight * TEAM_POSITION_BOTTOM_Y }, // Position 1 at bottom
-      { team: selectedTeams[1], y: canvasHeight * TEAM_POSITION_MIDDLE_Y }, // Position 2 at middle
-      { team: selectedTeams[2], y: canvasHeight * TEAM_POSITION_TOP_Y }, // Position 3 at top
-    ];
-    
-    redTeams.forEach(({ team, y }) => {
-      if (team && team.trim()) {
-        ctx.save();
-        ctx.translate(redX, y);
-        ctx.rotate(-Math.PI / 2);
-        
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 3;
-        ctx.strokeText(team, 0, 0);
-        ctx.fillText(team, 0, 0);
-        
-        ctx.restore();
-      }
-    });
-  }, [selectedTeams]);
-
   const setupCanvas = useCallback(() => {
-    // Clear any pending setup calls
     if (setupTimeoutRef.current) {
       clearTimeout(setupTimeoutRef.current);
     }
 
-    // Debounce setup calls to prevent rapid successive calls
     setupTimeoutRef.current = setTimeout(() => {
-      const canvas = canvasRef.current;
+      const bgCanvas = backgroundCanvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
+      const drawingCanvas = drawingCanvasRef.current;
       const container = isFullscreen ? fullscreenRef.current : containerRef.current;
-      if (!canvas || !container) return;
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!bgCanvas || !overlayCanvas || !drawingCanvas || !container) return;
 
-      // Load and draw the field background
+      const bgCtx = bgCanvas.getContext('2d');
+      const overlayCtx = overlayCanvas.getContext('2d');
+      const drawingCtx = drawingCanvas.getContext('2d');
+      if (!bgCtx || !overlayCtx || !drawingCtx) return;
+
       const img = new Image();
       img.onload = () => {
-      // Store the background image globally for use in erasing
-      setGlobalBackgroundImage(img);
-      
-      let containerWidth, containerHeight;
-      
-      if (isFullscreen) {
-        // For fullscreen, calculate available space more carefully
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        
-        // Account for header + controls (no padding on mobile)
-        let reservedHeight = isMobile ? 100 : 180; // Mobile: compact header + controls, Desktop: larger with padding
-        
-        // Add space for stage switcher and controls if they're visible
-        if (!hideControls || !isMobile) {
-          reservedHeight += isMobile ? 0 : 100; // Only add extra on desktop
+        setGlobalBackgroundImage(img);
+
+        let containerWidth, containerHeight;
+
+        if (isFullscreen) {
+          const viewportHeight = window.innerHeight;
+          const viewportWidth = window.innerWidth;
+
+
+          const isControlsVisible = !hideControls;
+
+          // Calculate reserved height based on UI components
+          // Header (~60px) + Footer (~40px) = ~100px base
+          let reservedHeight = isMobile
+            ? 100 // Header + Footer
+            : CANVAS_CONSTANTS.DESKTOP_RESERVED_HEIGHT_BASE;
+
+          // Add controls height if visible
+          if (isControlsVisible) {
+            // Mobile controls (DrawingControls) take up vertical space
+            // Desktop controls are often inline or absolute depending on layout, but let's keep existing logic for desktop
+            reservedHeight += isMobile ? 80 : 100;
+          }
+
+          // Mobile: Use full width (almost)
+          // Desktop: Reserve sidebar/padding
+          const reservedWidth = isMobile ? 0 : 32;
+
+          containerWidth = viewportWidth - reservedWidth;
+          containerHeight = viewportHeight - reservedHeight;
+        } else {
+          const containerRect = container.getBoundingClientRect();
+          const padding = 32;
+          containerWidth = containerRect.width - padding;
+          containerHeight = containerRect.height - padding;
         }
-        
-        // Reserve space for floating controls on mobile - increased to prevent overlap on real devices
-        const reservedWidth = isMobile ? MOBILE_RESERVED_WIDTH_FOR_CONTROLS : 32; // Mobile: extra space for floating controls, Desktop: standard padding
-        
-        containerWidth = viewportWidth - reservedWidth;
-        containerHeight = viewportHeight - reservedHeight;
-      } else {
-        // Normal mode - use container dimensions
-        const containerRect = container.getBoundingClientRect();
-        const padding = 32;
-        containerWidth = containerRect.width - padding;
-        containerHeight = containerRect.height - padding;
-      }
 
-      // Calculate aspect ratio preserving dimensions
-      const imgAspectRatio = img.width / img.height;
-      const containerAspectRatio = containerWidth / containerHeight;
+        const imgAspectRatio = img.width / img.height;
+        const containerAspectRatio = containerWidth / containerHeight;
 
-      let canvasWidth, canvasHeight;
+        let canvasWidth, canvasHeight;
 
-      if (imgAspectRatio > containerAspectRatio) {
-        // Image is wider relative to container
-        canvasWidth = containerWidth;
-        canvasHeight = containerWidth / imgAspectRatio;
-      } else {
-        // Image is taller relative to container
-        canvasHeight = containerHeight;
-        canvasWidth = containerHeight * imgAspectRatio;
-      }
+        if (imgAspectRatio > containerAspectRatio) {
+          canvasWidth = containerWidth;
+          canvasHeight = containerWidth / imgAspectRatio;
+        } else {
+          canvasHeight = containerHeight;
+          canvasWidth = containerHeight * imgAspectRatio;
+        }
 
-      // Set canvas dimensions (internal resolution)
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-      
-      // Set canvas display size to exactly match internal dimensions (no scaling)
-      canvas.style.width = `${canvasWidth}px`;
-      canvas.style.height = `${canvasHeight}px`;
+        // Report dimensions to parent for stacked canvas sizing
+        if (onDimensionsChange) {
+          onDimensionsChange({ width: canvasWidth, height: canvasHeight });
+        }
 
-      // Store background image reference for erasing
-      backgroundImageRef.current = img;
+        // Set up all three canvases with same dimensions
+        [bgCanvas, overlayCanvas, drawingCanvas].forEach(canvas => {
+          canvas.width = canvasWidth;
+          canvas.height = canvasHeight;
+        });
 
-      // Load saved drawing if exists, otherwise draw background
-      const savedData = localStorage.getItem(`fieldStrategy_${currentStageId}`);
-      if (savedData) {
-        const savedImg = new Image();
-        savedImg.onload = () => {
-          // Draw the saved content (which already includes background)
-          ctx.drawImage(savedImg, 0, 0, canvasWidth, canvasHeight);
-          // Draw team numbers on top
-          drawTeamNumbersOnCanvas(ctx, canvasWidth, canvasHeight);
-          // Initialize undo history after canvas drawing is complete
-          // Use requestAnimationFrame to ensure rendering is complete before initializing history
+        backgroundImageRef.current = img;
+
+        // LAYER 1: Draw field background (static)
+        bgCtx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+
+        // LAYER 2: Draw team number overlays
+        overlayCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+        drawTeamNumbers(overlayCtx, canvasWidth, canvasHeight, selectedTeams);
+
+        // LAYER 3: Load saved drawings or start fresh
+        drawingCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+        const savedData = localStorage.getItem(`fieldStrategy_${currentStageId}`);
+        if (savedData) {
+          const savedImg = new Image();
+          savedImg.onload = () => {
+            drawingCtx.drawImage(savedImg, 0, 0, canvasWidth, canvasHeight);
+            if (onCanvasReady) {
+              requestAnimationFrame(() => onCanvasReady());
+            }
+          };
+          savedImg.src = savedData;
+        } else {
           if (onCanvasReady) {
             requestAnimationFrame(() => onCanvasReady());
           }
-        };
-        savedImg.src = savedData;
-      } else {
-        // Only draw background if no saved data exists
-        ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
-        // Draw team numbers on top
-        drawTeamNumbersOnCanvas(ctx, canvasWidth, canvasHeight);
-        // Initialize undo history after canvas drawing is complete
-        // Use requestAnimationFrame to ensure rendering is complete before initializing history
-        if (onCanvasReady) {
-          requestAnimationFrame(() => onCanvasReady());
         }
-      }
-    };
-    img.src = fieldImage;
-    }, 50); // 50ms debounce
-  }, [currentStageId, isFullscreen, hideControls, isMobile, canvasRef, containerRef, fullscreenRef, onCanvasReady, drawTeamNumbersOnCanvas]);
+      };
+      img.src = fieldImagePath;
+    }, 50);
+  }, [fieldImagePath, currentStageId, isFullscreen, hideControls, isMobile, backgroundCanvasRef, overlayCanvasRef, drawingCanvasRef, containerRef, fullscreenRef, onCanvasReady, onDimensionsChange, selectedTeams]);
+
+  // Re-draw overlay when teams change
+  useEffect(() => {
+    const overlayCanvas = overlayCanvasRef.current;
+    if (!overlayCanvas) return;
+    const ctx = overlayCanvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    drawTeamNumbers(ctx, overlayCanvas.width, overlayCanvas.height, selectedTeams);
+  }, [selectedTeams, overlayCanvasRef]);
 
   useEffect(() => {
     setupCanvas();
 
-    // Resize handler - only for fullscreen mode
     const handleResize = () => {
       if (isFullscreen) {
         setupCanvas();
@@ -224,8 +178,7 @@ export const useCanvasSetup = ({
     };
 
     window.addEventListener('resize', handleResize);
-    
-    // Cleanup function
+
     return () => {
       window.removeEventListener('resize', handleResize);
       if (setupTimeoutRef.current) {
@@ -234,23 +187,15 @@ export const useCanvasSetup = ({
     };
   }, [setupCanvas, isFullscreen]);
 
+  // Clear only the drawing layer
   const clearCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !backgroundImageRef.current) return;
+    const drawingCanvas = drawingCanvasRef.current;
+    const ctx = drawingCanvas?.getContext('2d');
+    if (!drawingCanvas || !ctx) return;
 
-    // Clear the entire canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Redraw just the background image
-    ctx.drawImage(backgroundImageRef.current, 0, 0, canvas.width, canvas.height);
-
-    // Redraw team numbers
-    drawTeamNumbersOnCanvas(ctx, canvas.width, canvas.height);
-
-    // Clear saved data
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
     localStorage.removeItem(`fieldStrategy_${currentStageId}`);
-  }, [currentStageId, canvasRef, drawTeamNumbersOnCanvas]);
+  }, [currentStageId, drawingCanvasRef]);
 
   return {
     backgroundImageRef,

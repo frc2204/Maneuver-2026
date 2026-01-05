@@ -1,129 +1,58 @@
-import { useMemo } from "react";
-import { ScoutingEntryBase } from "@/types/scouting-entry";
-import { StrategyConfig, AggregationType, ColumnFilter, TeamData } from "@/core/types/strategy";
-
-// Helper keys for standard aggregations
-const getNumericValue = (value: unknown): number => {
-    if (typeof value === "number") return value;
-    if (typeof value === "boolean") return value ? 1 : 0;
-    return 0;
-};
-
-// Generic aggregation function
-const calculateAggregation = (values: number[], type: AggregationType): number => {
-    if (values.length === 0) return 0;
-    switch (type) {
-        case "average":
-            return values.reduce((sum, val) => sum + val, 0) / values.length;
-        case "median": {
-            const sorted = [...values].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            const val1 = sorted[mid - 1];
-            const val2 = sorted[mid];
-            return sorted.length % 2 === 0 && val1 !== undefined && val2 !== undefined
-                ? (val1 + val2) / 2
-                : (val2 ?? 0);
-        }
-        case "max":
-            return Math.max(...values);
-        case "75th": {
-            const sorted = [...values].sort((a, b) => a - b);
-            const index = Math.ceil(sorted.length * 0.75) - 1;
-            return sorted[Math.max(0, index)] ?? 0;
-        }
-        default:
-            return 0;
-    }
-};
-
 /**
- * Deeply get a value from an object using a dot-notated key
- * or by checking common phase prefixes (auto, teleop, endgame)
+ * Team Statistics Hook for Strategy Overview Page
+ * 
+ * This hook wraps useAllTeamStats and applies Strategy Overview-specific
+ * filtering and column visibility logic.
+ * 
+ * NOTE: This hook NO LONGER calculates stats directly. All calculations
+ * are done in game-template/calculations.ts via useAllTeamStats.
  */
-const getDeepValue = (obj: any, key: string): any => {
-    if (!obj) return undefined;
 
-    // Direct match
-    if (obj[key] !== undefined) return obj[key];
+import { useMemo } from "react";
+import { useAllTeamStats } from "./useAllTeamStats";
+import { StrategyConfig, ColumnFilter, TeamData } from "@/core/types/strategy";
 
-    // Check nested in gameData phases if match is not direct
-    if (obj.auto && obj.auto[key] !== undefined) return obj.auto[key];
-    if (obj.teleop && obj.teleop[key] !== undefined) return obj.teleop[key];
-    if (obj.endgame && obj.endgame[key] !== undefined) return obj.endgame[key];
-
-    // Try dot notation if key has it
-    if (key.includes('.')) {
-        return key.split('.').reduce((o, i) => (o ? o[i] : undefined), obj);
-    }
-
-    return undefined;
-};
+export interface UseTeamStatisticsResult {
+    teamStats: TeamData[];
+    filteredTeamStats: TeamData[];
+    isLoading: boolean;
+    error: Error | null;
+}
 
 export const useTeamStatistics = (
-    filteredData: ScoutingEntryBase[],
+    eventKey: string | undefined,
     config: StrategyConfig,
-    aggregationType: AggregationType,
     columnFilters: Record<string, ColumnFilter>
-) => {
+): UseTeamStatisticsResult => {
+    // Get centralized team stats
+    const { teamStats: allTeamStats, isLoading, error } = useAllTeamStats(eventKey);
+
+    // Convert TeamStats to TeamData format (for backwards compatibility)
     const teamStats = useMemo(() => {
-        const teamMap = new Map<string, ScoutingEntryBase[]>();
-
-        // Group by Team + Event
-        filteredData.forEach(entry => {
-            const teamNumber = entry.teamNumber;
-            const eventKey = entry.eventKey;
-            if (!teamNumber || !eventKey) return;
-
-            const key = `${teamNumber}_${eventKey}`;
-            if (!teamMap.has(key)) teamMap.set(key, []);
-            teamMap.get(key)!.push(entry);
-        });
-
-        const stats: TeamData[] = [];
-
-        teamMap.forEach((entries, key) => {
-            const [teamStr, event] = key.split('_');
-            const teamNumber = parseInt(teamStr || "0");
-
-            const teamRow: TeamData = {
-                teamNumber,
-                eventName: event || "Unknown",
-                matchCount: entries.length
+        return allTeamStats.map(stats => {
+            const teamData: TeamData = {
+                teamNumber: parseInt(stats.teamNumber),
+                eventName: stats.eventName,
+                matchCount: stats.matchCount,
             };
 
-            // Calculate metrics based on config
+            // Map all stats to the TeamData object
+            // This allows the existing table/chart code to work without changes
             config.columns.forEach(col => {
                 if (["teamNumber", "eventName", "matchCount"].includes(col.key)) return;
 
-                // 1. Check if it's a calculated aggregate
-                if (config.aggregates && config.aggregates[col.key]) {
-                    const calc = config.aggregates[col.key];
-                    if (calc) {
-                        const values = entries.map(e => calc(e.gameData));
-                        teamRow[col.key] = calculateAggregation(values, aggregationType);
-                    }
-                }
-                // 2. Check if it's a direct numeric value
-                else if (col.numeric) {
-                    const values = entries.map(e => {
-                        return getNumericValue(getDeepValue(e.gameData, col.key));
-                    });
-                    teamRow[col.key] = calculateAggregation(values, aggregationType);
-                }
-                // 3. Boolean/Percentage columns
-                else if (col.percentage) {
-                    const trueCount = entries.filter(e => getDeepValue(e.gameData, col.key) === true).length;
-                    teamRow[col.key] = (trueCount / entries.length) * 100;
+                // Get value from stats using dot notation
+                const value = getValueByPath(stats, col.key);
+                if (value !== undefined) {
+                    teamData[col.key] = value;
                 }
             });
 
-            stats.push(teamRow);
+            return teamData;
         });
+    }, [allTeamStats, config.columns]);
 
-        return stats.sort((a, b) => a.teamNumber - b.teamNumber);
-    }, [filteredData, config, aggregationType]);
-
-    // Apply filtering
+    // Apply column filters
     const filteredTeamStats = useMemo(() => {
         if (Object.keys(columnFilters).length === 0) return teamStats;
 
@@ -139,12 +68,32 @@ export const useTeamStatistics = (
                     case "<=": return val <= filter.value;
                     case "=": return Math.abs(val - filter.value) < 0.001;
                     case "!=": return Math.abs(val - filter.value) >= 0.001;
+                    case "between":
+                        return filter.value2 !== undefined
+                            ? val >= filter.value && val <= filter.value2
+                            : true;
                     default: return true;
                 }
             });
         });
-
     }, [teamStats, columnFilters]);
 
-    return { teamStats, filteredTeamStats };
+    return { teamStats, filteredTeamStats, isLoading, error };
 };
+
+/**
+ * Helper to get nested value from object using dot notation
+ */
+function getValueByPath(obj: any, path: string): any {
+    if (!obj) return undefined;
+
+    // Direct match
+    if (obj[path] !== undefined) return obj[path];
+
+    // Dot notation
+    if (path.includes('.')) {
+        return path.split('.').reduce((o, key) => o?.[key], obj);
+    }
+
+    return undefined;
+}

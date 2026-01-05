@@ -8,6 +8,7 @@ import { TeamStatsTableEnhanced } from "@/core/components/Strategy/TeamStatsTabl
 import { loadScoutingData } from "@/core/lib/scoutingDataUtils";
 import { ScoutingEntryBase } from "@/types/scouting-entry";
 import { AggregationType, ColumnFilter, FilterOperator } from "@/core/types/strategy";
+import { Skeleton } from "@/core/components/ui/skeleton";
 
 export default function StrategyOverviewPage() {
     const [scoutingData, setScoutingData] = useState<ScoutingEntryBase[]>([]);
@@ -90,16 +91,10 @@ export default function StrategyOverviewPage() {
         return Array.from(new Set(scoutingData.map((d) => d.eventKey))).sort();
     }, [scoutingData]);
 
-    const filteredScoutingData = useMemo(() => {
-        if (selectedEvent === "all") return scoutingData;
-        return scoutingData.filter((d) => d.eventKey === selectedEvent);
-    }, [scoutingData, selectedEvent]);
-
-    // Calculate statistics using generic hook
-    const { teamStats, filteredTeamStats } = useTeamStatistics(
-        filteredScoutingData,
+    // Calculate statistics using centralized hook
+    const { teamStats, filteredTeamStats, isLoading, error } = useTeamStatistics(
+        selectedEvent === "all" ? undefined : selectedEvent,
         { ...strategyConfig, columns: columnConfig },
-        aggregationType,
         columnFilters
     );
 
@@ -148,6 +143,40 @@ export default function StrategyOverviewPage() {
     const handleClearAllFilters = () => {
         setColumnFilters({});
     };
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-screen text-destructive">
+                <div className="text-center">
+                    <h2 className="text-lg font-semibold">Error Loading Data</h2>
+                    <p className="text-muted-foreground">{error.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col min-h-screen gap-6 p-4 md:p-8">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <Skeleton className="h-10 w-64" />
+                        <div className="flex gap-2">
+                            <Skeleton className="h-10 w-32" />
+                            <Skeleton className="h-10 w-32" />
+                        </div>
+                    </div>
+                </div>
+                <Skeleton className="h-[400px] w-full rounded-xl" />
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col min-h-screen gap-6 p-4 md:p-8">

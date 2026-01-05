@@ -18,6 +18,8 @@ export interface GameData {
         action2Count: number;
         action3Count: number;
         action4Count: number;
+        toggle1: boolean;
+        toggle2: boolean;
     };
     teleop: {
         action1Count: number;
@@ -28,6 +30,8 @@ export interface GameData {
         option1: boolean;
         option2: boolean;
         option3: boolean;
+        option4: boolean;
+        option5: boolean;
         toggle1: boolean;
         toggle2: boolean;
     };

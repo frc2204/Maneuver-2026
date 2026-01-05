@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { getGlobalBackgroundImage } from "./useCanvasSetup";
 
-// Maximum number of undo states to keep in history to prevent excessive memory usage
+// Maximum number of undo states to keep in history
 const MAX_UNDO_HISTORY_LENGTH = 20;
 
 interface Point {
@@ -15,6 +14,7 @@ interface UseCanvasDrawingProps {
   brushColor: string;
   isErasing: boolean;
   onSave: () => void;
+  selectedTeams?: string[]; // Kept for API compatibility, but no longer used
 }
 
 export const useCanvasDrawing = ({
@@ -22,13 +22,18 @@ export const useCanvasDrawing = ({
   brushSize,
   brushColor,
   isErasing,
-  onSave
+  onSave,
 }: UseCanvasDrawingProps) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
   const [canUndo, setCanUndo] = useState(false);
+
+  // History stores canvas states AFTER each stroke
+  // history[0] = initial state
+  // history[1] = after first stroke
+  // etc.
   const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef(-1);
+  const historyIndexRef = useRef(0);
 
   const getPointFromEvent = useCallback((e: React.MouseEvent | React.PointerEvent): Point => {
     const canvas = canvasRef.current;
@@ -44,80 +49,97 @@ export const useCanvasDrawing = ({
     };
   }, [canvasRef]);
 
-  const restoreBackgroundInArea = useCallback((x: number, y: number, width: number, height: number) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    const backgroundImage = getGlobalBackgroundImage();
-    
-    if (!canvas || !ctx || !backgroundImage) return;
-
-    // Create a clipping region and redraw background in that area
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, width, height);
-    ctx.clip();
-    
-    // Redraw the background image in the clipped area
-    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-    
-    ctx.restore();
-  }, [canvasRef]);
-
+  // Initialize history with current canvas state (call once after canvas is set up)
   const initializeHistory = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
+    // Only initialize if history is empty
+    if (historyRef.current.length > 0) return;
+
     const dataURL = canvas.toDataURL();
     historyRef.current = [dataURL];
     historyIndexRef.current = 0;
     setCanUndo(false);
   }, [canvasRef]);
 
+  // Save current state AFTER a stroke completes
   const saveToHistory = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
+    // Auto-initialize if needed
+    if (historyRef.current.length === 0) {
+      const dataURL = canvas.toDataURL();
+      historyRef.current = [dataURL];
+      historyIndexRef.current = 0;
+      console.log('[SaveToHistory] Auto-initialized with first state, canvas size:', canvas.width, 'x', canvas.height);
+    }
+
     const dataURL = canvas.toDataURL();
-    
-    // Remove any states after current index (for redo functionality)
+
+    // Check if canvas has any content (non-transparent pixels)
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+    const hasContent = imageData?.data.some((val, i) => i % 4 === 3 && val > 0) ?? false;
+    console.log('[SaveToHistory] Saving state - has visible content:', hasContent, 'canvas size:', canvas.width, 'x', canvas.height);
+
+    // Truncate any redo states (future states after current index)
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
-    
+
     // Add new state
     historyRef.current.push(dataURL);
     historyIndexRef.current = historyRef.current.length - 1;
-    
-    // Limit history to prevent memory issues
+
+    console.log('[SaveToHistory] History now has', historyRef.current.length, 'states, currentIndex:', historyIndexRef.current);
+
+    // Limit history size
     if (historyRef.current.length > MAX_UNDO_HISTORY_LENGTH) {
       historyRef.current.shift();
       historyIndexRef.current--;
     }
-    
+
     setCanUndo(historyIndexRef.current > 0);
   }, [canvasRef]);
 
   const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0) return;
-    
+    // Need at least 2 states to undo (initial + at least one change)
+    if (historyIndexRef.current <= 0 || historyRef.current.length < 2) {
+      console.log('[Undo] Cannot undo - index:', historyIndexRef.current, 'length:', historyRef.current.length);
+      return;
+    }
+
+    // Go back to previous state
+    const oldIndex = historyIndexRef.current;
     historyIndexRef.current--;
     const previousState = historyRef.current[historyIndexRef.current];
-    
+
+    console.log('[Undo] Going from index', oldIndex, 'to', historyIndexRef.current, '- history length:', historyRef.current.length);
+
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !previousState) return;
-    
+    if (!canvas || !ctx || !previousState) {
+      console.log('[Undo] Missing canvas, ctx, or previousState');
+      return;
+    }
+
     const img = new Image();
     img.onload = () => {
+      console.log('[Undo] Image loaded, natural size:', img.naturalWidth, 'x', img.naturalHeight, 'canvas size:', canvas.width, 'x', canvas.height);
+      // CRITICAL: Reset composite operation to source-over before drawing
+      // After erasing, it stays at 'destination-out' which would erase instead of draw!
+      ctx.globalCompositeOperation = 'source-over';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
+      // Draw at canvas dimensions to handle any size differences
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       setCanUndo(historyIndexRef.current > 0);
-      onSave(); // Auto-save after undo
+      onSave();
     };
     img.onerror = () => {
-      // Revert the history index to undo the failed undo
+      console.log('[Undo] Image load failed');
       historyIndexRef.current++;
       setCanUndo(historyIndexRef.current > 0);
-      // Log the error for debugging
-      console.warn("Undo failed: could not load image from history (corrupted data URL).");
+      console.warn("Undo failed: could not load image from history.");
     };
     img.src = previousState;
   }, [canvasRef, onSave]);
@@ -125,16 +147,15 @@ export const useCanvasDrawing = ({
   const startDrawing = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Capture the pointer to prevent other elements from receiving pointer events
+
     if ('setPointerCapture' in e.currentTarget && e.currentTarget instanceof HTMLElement) {
       try {
         e.currentTarget.setPointerCapture((e as React.PointerEvent).pointerId);
       } catch {
-        // Ignore errors if pointer capture fails
+        // Ignore
       }
     }
-    
+
     setIsDrawing(true);
     const point = getPointFromEvent(e);
     setLastPoint(point);
@@ -143,8 +164,8 @@ export const useCanvasDrawing = ({
   const draw = useCallback((e: React.MouseEvent | React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (!isDrawing) return;
+
+    if (!isDrawing || !lastPoint) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -152,70 +173,46 @@ export const useCanvasDrawing = ({
 
     const currentPoint = getPointFromEvent(e);
 
-    if (isErasing) {
-      // For erasing, first erase the user content, then restore background
-      ctx.save();
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-      if (lastPoint) {
-        ctx.beginPath();
-        ctx.moveTo(lastPoint.x, lastPoint.y);
-        ctx.lineTo(currentPoint.x, currentPoint.y);
-        ctx.stroke();
-      }
-      
-      ctx.restore();
-      
-      // Restore background in the erased area
-      if (lastPoint && getGlobalBackgroundImage()) {
-        const minX = Math.min(lastPoint.x, currentPoint.x) - brushSize;
-        const minY = Math.min(lastPoint.y, currentPoint.y) - brushSize;
-        const maxX = Math.max(lastPoint.x, currentPoint.x) + brushSize;
-        const maxY = Math.max(lastPoint.y, currentPoint.y) + brushSize;
-        
-        restoreBackgroundInArea(minX, minY, maxX - minX, maxY - minY);
-      }
+    if (isErasing) {
+      // SIMPLE ERASING: destination-out makes pixels transparent
+      // Since drawing layer is isolated, this reveals the background/overlay layers beneath
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
     } else {
       // Normal drawing
       ctx.globalCompositeOperation = 'source-over';
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
       ctx.strokeStyle = brushColor;
-
-      if (lastPoint) {
-        ctx.beginPath();
-        ctx.moveTo(lastPoint.x, lastPoint.y);
-        ctx.lineTo(currentPoint.x, currentPoint.y);
-        ctx.stroke();
-      }
     }
 
+    ctx.beginPath();
+    ctx.moveTo(lastPoint.x, lastPoint.y);
+    ctx.lineTo(currentPoint.x, currentPoint.y);
+    ctx.stroke();
+
     setLastPoint(currentPoint);
-  }, [isDrawing, getPointFromEvent, isErasing, brushSize, brushColor, lastPoint, canvasRef, restoreBackgroundInArea]);
+  }, [isDrawing, getPointFromEvent, isErasing, brushSize, brushColor, lastPoint, canvasRef]);
 
   const stopDrawing = useCallback((e?: React.MouseEvent | React.PointerEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
-      
-      // Release pointer capture if it was set
+
       if ('releasePointerCapture' in e.currentTarget && e.currentTarget instanceof HTMLElement) {
         try {
           e.currentTarget.releasePointerCapture((e as React.PointerEvent).pointerId);
         } catch {
-          // Ignore errors if pointer capture release fails
+          // Ignore
         }
       }
     }
-    
+
     if (isDrawing) {
-      // Save to history after drawing is complete
+      // Save state AFTER stroke completes
       saveToHistory();
-      // Auto-save when drawing stops
       onSave();
     }
     setIsDrawing(false);
@@ -228,9 +225,9 @@ export const useCanvasDrawing = ({
     MozUserSelect: 'none',
     msUserSelect: 'none',
     display: 'block',
-    touchAction: 'none', // Prevent all touch gestures
-    WebkitTouchCallout: 'none', // Disable iOS callout
-    WebkitTapHighlightColor: 'transparent' // Remove tap highlight on mobile
+    touchAction: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitTapHighlightColor: 'transparent'
   };
 
   const canvasEventHandlers = {
@@ -251,6 +248,7 @@ export const useCanvasDrawing = ({
     isDrawing,
     undo,
     canUndo,
-    initializeHistory
+    initializeHistory,
+    saveToHistory
   };
 };

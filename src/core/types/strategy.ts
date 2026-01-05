@@ -181,11 +181,12 @@ export interface Leaderboard {
 // ==============================================================================
 
 export type AggregationType = "average" | "median" | "max" | "75th";
-export type FilterOperator = ">" | ">=" | "<" | "<=" | "=" | "!=";
+export type FilterOperator = ">" | ">=" | "<" | "<=" | "=" | "!=" | "between";
 
 export interface ColumnFilter {
   operator: FilterOperator;
   value: number;
+  value2?: number;
 }
 
 export interface StrategyColumnConfig {

@@ -34,6 +34,7 @@ import JSONDataTransferPage from "@/core/pages/JSONDataTransferPage";
 // import EndgamePage from "@/pages/EndgamePage";
 import TeamStatsPage from "@/core/pages/TeamStatsPage";
 import StrategyOverviewPage from "@/core/pages/StrategyOverviewPage";
+import MatchStrategyPage from "@/core/pages/MatchStrategyPage";
 // import PitScoutingPage from "@/pages/PitScoutingPage";
 // import ScoutManagementDashboardPage from "./pages/ScoutManagementDashboardPage";
 // import AchievementsPage from "./pages/AchievementsPage";
@@ -100,6 +101,7 @@ function App() {
         {/* <Route path="/endgame" element={<EndgamePage />} /> */}
         <Route path="/team-stats" element={<TeamStatsPage />} />
         <Route path="/strategy-overview" element={<StrategyOverviewPage />} />
+        <Route path="/match-strategy" element={<MatchStrategyPage />} />
         {/* <Route path="/pit-scouting" element={<PitScoutingPage />} /> 
         {/* <Route path="/pick-list" element={<PickListPage />} /> */}
         {/* <Route path="/match-validation" element={<MatchValidationPage />} /> */}
