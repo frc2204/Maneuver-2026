@@ -86,6 +86,12 @@ interface ScoringSectionsProps {
   onStatusUpdate?: (updates: Partial<any>) => void;
   onUndo?: () => void;
   canUndo?: boolean;
+  // Navigation props (for full-screen implementations)
+  matchNumber?: string | number;
+  matchType?: 'qm' | 'sf' | 'f';
+  teamNumber?: string | number;
+  onBack?: () => void;
+  onProceed?: () => void;
 }
 
 /**
