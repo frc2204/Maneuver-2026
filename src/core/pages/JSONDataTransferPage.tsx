@@ -6,6 +6,7 @@ import { convertArrayOfArraysToCSV } from "@/core/lib/utils";
 import { loadScoutingData } from "@/core/lib/scoutingDataUtils";
 import { loadPitScoutingData, exportPitScoutingToCSV, downloadPitScoutingImagesOnly } from "@/core/lib/pitScoutingUtils";
 import { gamificationDB as gameDB } from "@/game-template/gamification";
+import { csvExcludedFields } from "@/game-template/transformation";
 import { Separator } from "@/core/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select";
 
@@ -44,6 +45,9 @@ const JSONDataTransferPage = () => {
           const endgameFieldsSet = new Set<string>();
           const otherFieldsSet = new Set<string>();
 
+          // Game-specific fields to exclude from CSV (e.g. large visualization arrays)
+          const excludedFields = new Set(csvExcludedFields);
+
           // Helper function to recursively flatten nested objects
           const flattenObject = (obj: Record<string, any>, prefix = ''): Record<string, any> => {
             const flattened: Record<string, any> = {};
@@ -51,9 +55,17 @@ const JSONDataTransferPage = () => {
               const value = obj[key];
               const newKey = prefix ? `${prefix}.${key}` : key;
 
+              // Skip excluded visualization fields
+              if (excludedFields.has(newKey)) {
+                continue;
+              }
+
               if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
                 // Recursively flatten nested objects
                 Object.assign(flattened, flattenObject(value, newKey));
+              } else if (Array.isArray(value)) {
+                // Convert arrays to JSON strings to prevent [object Object] in CSV
+                flattened[newKey] = JSON.stringify(value);
               } else {
                 flattened[newKey] = value;
               }
@@ -111,7 +123,16 @@ const JSONDataTransferPage = () => {
               const flattened = flattenObject(entry.gameData as Record<string, any>);
               for (const field of gameDataFields) {
                 const value = flattened[field];
-                row.push(value !== undefined ? value as string | number : '');
+                if (value === undefined || value === null) {
+                  row.push('');
+                } else if (typeof value === 'string' || typeof value === 'number') {
+                  row.push(value);
+                } else if (typeof value === 'boolean') {
+                  row.push(value ? 'true' : 'false');
+                } else {
+                  // Safety fallback: stringify any remaining objects/arrays
+                  row.push(JSON.stringify(value));
+                }
               }
             } else {
               // Fill with empty strings if no gameData
