@@ -226,7 +226,7 @@ export const gameDataTransformation: DataTransformation = {
           case 'pass':
             result.teleop.fuelPassedCount = (result.teleop.fuelPassedCount || 0) + Math.abs(wp.fuelDelta || 0);
             break;
-          case 'climb':
+          case 'climb': {
             // Track climb level and outcome in endgame section
             const level = wp.climbLevel || 1;
             if (wp.climbResult === 'success') {
@@ -235,6 +235,7 @@ export const gameDataTransformation: DataTransformation = {
               result.endgame.climbFailed = true;
             }
             break;
+          }
           case 'defense':
             // Track defense by zone
             if (wp.zone === 'allianceZone') {
