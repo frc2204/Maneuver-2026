@@ -18,17 +18,7 @@ import { createDecoder, binaryToBlock } from "luby-transform";
 import { toUint8Array } from "js-base64";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import * as pako from 'pako';
-
-interface FountainPacket {
-  type: string;
-  sessionId: string;
-  packetId: number;
-  k: number;
-  bytes: number;
-  checksum: string;
-  indices: number[];
-  data: string; // Base64 encoded binary data
-}
+import { parseScannedFountainPacket, type FountainPacket } from "@/core/lib/fountainPacket";
 
 export interface UniversalFountainScannerProps {
   onBack: () => void;
@@ -154,10 +144,8 @@ export const UniversalFountainScanner = ({
       }
 
       // Try to parse the QR code - if it's not valid JSON, it's not a fountain code
-      let packet: FountainPacket;
-      try {
-        packet = JSON.parse(result[0].rawValue);
-      } catch {
+      const packet = parseScannedFountainPacket(result[0].rawValue);
+      if (!packet) {
         // Not a fountain code QR - silently ignore (could be a URL, text, etc.)
         addDebugMsg(`⚠️ Not a fountain code QR (invalid JSON)`);
         return;
@@ -169,7 +157,8 @@ export const UniversalFountainScanner = ({
         return;
       }
 
-      addDebugMsg(`🎯 Scanned packet ${packet.packetId} with indices [${packet.indices.join(',')}]`);
+      const indexPreview = packet.indices ? packet.indices.join(',') : 'compact';
+      addDebugMsg(`🎯 Scanned packet ${packet.packetId} with indices [${indexPreview}]`);
       addDebugMsg(`🆔 Session: ${packet.sessionId.slice(-8)}`);
 
       if (packet.type !== expectedPacketType) {
@@ -198,7 +187,7 @@ export const UniversalFountainScanner = ({
       // Check if we already have this packet
       if (packetsRef.current.has(packet.packetId) && !allowDuplicates) {
         addDebugMsg(`🔁 Duplicate packet ${packet.packetId} ignored`);
-        addDebugMsg(`🔍 Current: indices [${packet.indices.join(',')}]`);
+        addDebugMsg(`🔍 Current: indices [${indexPreview}]`);
         return;
       }
 
