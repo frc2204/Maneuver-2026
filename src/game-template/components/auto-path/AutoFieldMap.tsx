@@ -45,6 +45,10 @@ import { AutoPathProvider, useAutoScoring } from "@/game-template/contexts";
 import { actions as schemaActions } from "@/game-template/game-schema";
 import { formatDurationSecondsLabel } from "@/game-template/duration";
 import { AUTO_PHASE_DURATION_MS } from "@/game-template/constants";
+import {
+    GAME_SCOUT_OPTION_KEYS,
+    getEffectiveScoutOptions,
+} from "@/game-template/scout-options";
 
 // Local sub-components
 import { AutoActionLog } from "./components/AutoActionLog";
@@ -215,6 +219,9 @@ function AutoFieldMapContent({
     const isBrokenDown = brokenDownStart !== null;
 
     const isMobile = useIsMobile();
+    const effectiveScoutOptions = getEffectiveScoutOptions();
+    const disableHubFuelScoringPopup =
+        effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableHubFuelScoringPopup] === true;
 
     // Load pit scouting data for fuel capacity
     useEffect(() => {
@@ -501,14 +508,21 @@ function AutoFieldMapContent({
                 type: 'score',
                 action: isDrag ? 'shoot-path' : 'hub',
                 position: pos,
-                fuelDelta: -8, // Default, will be finalized in amount selection
-                amountLabel: '...', // Placeholder until confirmed
+                fuelDelta: disableHubFuelScoringPopup ? 0 : -8, // Default, finalized in amount selection unless popup disabled
+                amountLabel: disableHubFuelScoringPopup ? undefined : '...',
                 timestamp: Date.now(),
                 pathPoints: isDrag ? points : undefined,
             };
-            setAccumulatedFuel(0);
-            setFuelHistory([]);
-            setPendingWaypoint(waypoint);
+            if (disableHubFuelScoringPopup) {
+                onAddAction(waypoint);
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
+                setPendingWaypoint(null);
+            } else {
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
+                setPendingWaypoint(waypoint);
+            }
             setIsSelectingScore(false);
         } else if (isSelectingPass) {
             const waypoint: PathWaypoint = {
@@ -840,7 +854,7 @@ function AutoFieldMapContent({
                         }}
                         onClimbResultSelect={setClimbResult}
                         allowClimbFail={!recordingMode}
-                        skipClimbOutcomeSelection={true}
+                        skipClimbOutcomeSelection={recordingMode}
                         onConfirm={(selectedClimbStartTimeSecRemaining) => {
                             let delta = 0;
                             let label = '';

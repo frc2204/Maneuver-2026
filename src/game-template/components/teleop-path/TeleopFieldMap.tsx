@@ -40,6 +40,10 @@ import {
 import { TeleopPathProvider, useTeleopScoring } from '@/game-template/contexts';
 import { formatDurationSecondsLabel } from '@/game-template/duration';
 import { TELEOP_PHASE_DURATION_MS } from '@/game-template/constants';
+import {
+    GAME_SCOUT_OPTION_KEYS,
+    getEffectiveScoutOptions,
+} from '@/game-template/scout-options';
 
 // Local sub-components
 import { TeleopActionLog } from './components/TeleopActionLog';
@@ -144,6 +148,9 @@ function TeleopFieldMapContent() {
     }), []) as React.RefObject<HTMLCanvasElement>;
 
     const isMobile = useIsMobile();
+    const effectiveScoutOptions = getEffectiveScoutOptions();
+    const disableHubFuelScoringPopup =
+        effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableHubFuelScoringPopup] === true;
 
     // Local state (UI-only)
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -264,15 +271,22 @@ function TeleopFieldMapContent() {
                 type: 'score',
                 action: isDrag ? 'shoot-path' : 'hub',
                 position: endPos,
-                fuelDelta: 0,
-                amountLabel: '...',
+                fuelDelta: disableHubFuelScoringPopup ? 0 : 0,
+                amountLabel: disableHubFuelScoringPopup ? undefined : '...',
                 timestamp: Date.now(),
                 pathPoints: isDrag ? points : undefined,
                 zone: 'allianceZone',
             };
-            setAccumulatedFuel(0);
-            setFuelHistory([]);
-            setPendingWaypoint(waypoint);
+            if (disableHubFuelScoringPopup) {
+                onAddAction(waypoint);
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
+                setPendingWaypoint(null);
+            } else {
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
+                setPendingWaypoint(waypoint);
+            }
             setIsSelectingScore(false);
         } else if (isSelectingPass) {
             const waypoint: PathWaypoint = {
@@ -291,7 +305,19 @@ function TeleopFieldMapContent() {
             setPendingWaypoint(waypoint);
             setIsSelectingPass(false);
         }
-    }, [isSelectingScore, isSelectingPass, activeZone, generateId, setAccumulatedFuel, setFuelHistory, setPendingWaypoint, setIsSelectingScore, setIsSelectingPass]);
+    }, [
+        isSelectingScore,
+        isSelectingPass,
+        activeZone,
+        generateId,
+        setAccumulatedFuel,
+        setFuelHistory,
+        setPendingWaypoint,
+        setIsSelectingScore,
+        setIsSelectingPass,
+        disableHubFuelScoringPopup,
+        onAddAction,
+    ]);
 
     const handleElementClick = (elementKey: string) => {
         // Block if popup active or broken down

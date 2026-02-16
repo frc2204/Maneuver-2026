@@ -26,12 +26,16 @@ import { useWorkflowNavigation } from "@/core/hooks/useWorkflowNavigation";
 import { useScout } from "@/core/contexts/ScoutContext";
 import { useGame } from "@/core/contexts/GameContext";
 import type { ScoutOptionsState } from "@/types";
+import {
+  GAME_SCOUT_OPTION_DEFAULTS,
+} from "@/game-template/scout-options";
 
 const SCOUT_OPTIONS_STORAGE_KEY = "scoutOptions";
 
 const DEFAULT_SCOUT_OPTIONS: ScoutOptionsState = {
   [CORE_SCOUT_OPTION_KEYS.placeholderOptionA]: false,
   [CORE_SCOUT_OPTION_KEYS.placeholderOptionB]: false,
+  ...GAME_SCOUT_OPTION_DEFAULTS,
 };
 
 const GameStartPage = () => {
