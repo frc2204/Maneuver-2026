@@ -10,6 +10,9 @@ import { useWorkflowNavigation } from "@/core/hooks/useWorkflowNavigation";
 import { submitMatchData } from "@/core/lib/submitMatch";
 import { useGame } from "@/core/contexts/GameContext";
 import { workflowConfig } from "@/game-template/game-schema";
+import { CORE_SCOUT_OPTION_KEYS } from "@/core/components/GameStartComponents/ScoutOptionsSheet";
+import { MatchTransferQrModal } from "@/core/components/data-transfer/MatchTransferQr";
+import type { ScoutingEntryBase } from "@/core/types/scouting-entry";
 
 const TeleopScoringPage = () => {
   const location = useLocation();
@@ -37,6 +40,11 @@ const TeleopScoringPage = () => {
   const [scoringActions, setScoringActions] = useState(getSavedState());
   const [robotStatus, setRobotStatus] = useState(getSavedStatus());
   const [undoHistory, setUndoHistory] = useState(getSavedHistory());
+  const [postSubmitQrEntry, setPostSubmitQrEntry] = useState<ScoutingEntryBase<Record<string, unknown>> | null>(null);
+  const [showPostSubmitQrModal, setShowPostSubmitQrModal] = useState(false);
+
+  const shouldShowPostSubmitQr =
+    states?.inputs?.scoutOptions?.[CORE_SCOUT_OPTION_KEYS.placeholderOptionA] === true;
 
   // Save state to localStorage whenever actions change
   useEffect(() => {
@@ -105,7 +113,17 @@ const TeleopScoringPage = () => {
       const success = await submitMatchData({
         inputs: states?.inputs,
         transformation,
-        onSuccess: () => navigate('/game-start'),
+        onSuccess: () => {
+          if (!shouldShowPostSubmitQr) {
+            navigate('/game-start');
+          }
+        },
+        onEntrySaved: (entry) => {
+          if (shouldShowPostSubmitQr) {
+            setPostSubmitQrEntry(entry);
+            setShowPostSubmitQrModal(true);
+          }
+        },
       });
       if (!success) return;
     } else {
@@ -124,7 +142,19 @@ const TeleopScoringPage = () => {
   };
 
   return (
-    <div className="h-fit w-full flex flex-col items-center px-4 pt-12 pb-24 2xl:pb-6">
+    <>
+      <MatchTransferQrModal
+        open={showPostSubmitQrModal}
+        onOpenChange={(open) => {
+          setShowPostSubmitQrModal(open);
+          if (!open) {
+            navigate('/game-start');
+          }
+        }}
+        entry={postSubmitQrEntry}
+      />
+
+      <div className="h-fit w-full flex flex-col items-center px-4 pt-12 pb-24 2xl:pb-6">
       <div className="w-full max-w-7xl">
         <h1 className="text-2xl font-bold pb-4">Teleoperated</h1>
       </div>
@@ -274,6 +304,7 @@ const TeleopScoringPage = () => {
 
       </div>
     </div>
+    </>
   );
 };
 

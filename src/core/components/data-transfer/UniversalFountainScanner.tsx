@@ -30,6 +30,24 @@ interface FountainPacket {
   data: string; // Base64 encoded binary data
 }
 
+interface DirectMatchEntryPayload {
+  type: 'maneuver-match-entry';
+  version?: string;
+  compressed?: boolean;
+  encoding?: string;
+  generatedAt?: number;
+  data: string;
+}
+
+interface DirectPitEntryPayload {
+  type: 'maneuver-pit-entry';
+  version?: string;
+  compressed?: boolean;
+  encoding?: string;
+  generatedAt?: number;
+  data: string;
+}
+
 export interface UniversalFountainScannerProps {
   onBack: () => void;
   onSwitchToGenerator?: () => void;
@@ -43,6 +61,7 @@ export interface UniversalFountainScannerProps {
   description: string;
   completionMessage: string;
   onComplete?: () => void;
+  stayOnScannerAfterComplete?: boolean;
 }
 
 export const UniversalFountainScanner = ({
@@ -57,7 +76,8 @@ export const UniversalFountainScanner = ({
   title,
   description,
   completionMessage,
-  onComplete
+  onComplete,
+  stayOnScannerAfterComplete = false,
 }: UniversalFountainScannerProps) => {
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
@@ -121,23 +141,23 @@ export const UniversalFountainScanner = ({
   // STABLE REFS PATTERN: Ensure handleQRScan never changes to prevent Scanner re-init
   const propsRef = useRef({
     allowDuplicates, expectedPacketType, saveData, validateData,
-    completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete
+    completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete, stayOnScannerAfterComplete
   });
 
   // Update props ref on render
   useEffect(() => {
     propsRef.current = {
       allowDuplicates, expectedPacketType, saveData, validateData,
-      completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete
+      completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete, stayOnScannerAfterComplete
     };
-  }, [allowDuplicates, expectedPacketType, saveData, validateData, completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete]);
+  }, [allowDuplicates, expectedPacketType, saveData, validateData, completionMessage, getDataSummary, onBack, dataType, decompressData, onComplete, stayOnScannerAfterComplete]);
 
   const neededPacketsRef = useRef<number>(0);
 
   const handleQRScan = useCallback(async (result: { rawValue: string; }[]) => {
     // Destructure current props/state from ref (only those used in this callback)
     const {
-      allowDuplicates, expectedPacketType, saveData, validateData, decompressData
+      allowDuplicates, expectedPacketType, saveData, validateData, decompressData, stayOnScannerAfterComplete
     } = propsRef.current;
 
     // THROTTLE: Limit scan processing to once every 50ms (20fps max)
@@ -154,9 +174,9 @@ export const UniversalFountainScanner = ({
       }
 
       // Try to parse the QR code - if it's not valid JSON, it's not a fountain code
-      let packet: FountainPacket;
+      let parsedQr: unknown;
       try {
-        packet = JSON.parse(result[0].rawValue);
+        parsedQr = JSON.parse(result[0].rawValue);
       } catch {
         // Not a fountain code QR - silently ignore (could be a URL, text, etc.)
         addDebugMsg(`⚠️ Not a fountain code QR (invalid JSON)`);
@@ -164,6 +184,84 @@ export const UniversalFountainScanner = ({
       }
 
       // Validate that it's actually a fountain packet
+      if (parsedQr && typeof parsedQr === 'object' && 'type' in parsedQr) {
+        const directPayloadType = (parsedQr as { type?: string }).type;
+        const isDirectMatchPayload = directPayloadType === 'maneuver-match-entry';
+        const isDirectPitPayload = directPayloadType === 'maneuver-pit-entry';
+
+        if (!isDirectMatchPayload && !isDirectPitPayload) {
+          // Continue to fountain packet flow below
+        } else {
+          const directPayload = parsedQr as DirectMatchEntryPayload | DirectPitEntryPayload;
+
+          if (isDirectMatchPayload && expectedPacketType !== 'scouting_fountain_packet') {
+            addDebugMsg(`⚠️ Ignoring single-match payload for non-scouting scanner mode`);
+            return;
+          }
+
+          if (isDirectPitPayload && expectedPacketType !== 'pit-scouting_fountain_packet') {
+            addDebugMsg(`⚠️ Ignoring single-pit payload for non-pit scanner mode`);
+            return;
+          }
+
+          try {
+            const compressedBytes = toUint8Array(directPayload.data);
+            const decompressed = pako.ungzip(compressedBytes);
+            const jsonString = new TextDecoder().decode(decompressed);
+            const entry = JSON.parse(jsonString) as Record<string, unknown>;
+
+            const wrappedData = {
+              entries: [entry],
+              version: directPayload.version || '1.0-maneuver-core',
+              exportedAt: directPayload.generatedAt || Date.now(),
+            };
+
+            if (!validateData(wrappedData)) {
+              addDebugMsg(`❌ Direct ${isDirectMatchPayload ? 'single-match' : 'single-pit'} payload failed validation`);
+              toast.error(`Invalid ${isDirectMatchPayload ? 'single-match' : 'single-pit'} QR payload`);
+              return;
+            }
+
+            await saveData(wrappedData);
+
+            const entryTeam = (entry.teamNumber ?? '').toString();
+            const entryMatch = (entry.matchNumber ?? '').toString();
+            const entryEvent = (entry.eventKey ?? '').toString();
+
+            if (stayOnScannerAfterComplete) {
+              if (isDirectMatchPayload) {
+                toast.success(
+                  entryTeam && entryMatch
+                    ? `Imported Team ${entryTeam} Match ${entryMatch}`
+                    : 'Single-match data imported'
+                );
+              } else {
+                toast.success(
+                  entryTeam && entryEvent
+                    ? `Imported Pit Team ${entryTeam} (${entryEvent})`
+                    : 'Single-pit entry imported'
+                );
+              }
+              resetScanner();
+              return;
+            }
+
+            setReconstructedData(wrappedData);
+            setIsComplete(true);
+            setProgress({ received: 1, needed: 1, percentage: 100 });
+            setCompressionDetected(true);
+            addDebugMsg(`✅ Direct ${isDirectMatchPayload ? 'single-match' : 'single-pit'} payload imported successfully`);
+            return;
+          } catch (directError) {
+            addDebugMsg(`❌ Failed to decode direct ${isDirectMatchPayload ? 'single-match' : 'single-pit'} payload: ${directError instanceof Error ? directError.message : String(directError)}`);
+            toast.error(`Failed to decode ${isDirectMatchPayload ? 'single-match' : 'single-pit'} QR payload`);
+            return;
+          }
+        }
+      }
+
+      const packet = parsedQr as FountainPacket;
+
       if (!packet.type || !packet.sessionId || packet.packetId === undefined) {
         addDebugMsg(`⚠️ Not a fountain code packet (missing required fields)`);
         return;
@@ -266,11 +364,17 @@ export const UniversalFountainScanner = ({
             addDebugMsg(`🔍 Data keys: ${parsedData && typeof parsedData === 'object' ? Object.keys(parsedData as Record<string, unknown>).join(', ') : 'N/A'}`);
 
             if (validateData(parsedData)) {
+              await saveData(parsedData);
+
+              if (stayOnScannerAfterComplete && expectedPacketType === 'pit-scouting_fountain_packet') {
+                toast.success('Pit scouting data imported');
+                resetScanner();
+                return;
+              }
+
               setReconstructedData(parsedData);
               setIsComplete(true);
               setProgress({ received: packetsRef.current.size, needed: packetsRef.current.size, percentage: 100 });
-
-              await saveData(parsedData);
             } else {
               addDebugMsg("❌ Reconstructed data failed validation");
               toast.error("Reconstructed data is invalid");
@@ -369,6 +473,12 @@ export const UniversalFountainScanner = ({
   };
 
   const handleComplete = () => {
+    if (stayOnScannerAfterComplete) {
+      resetScanner();
+      toast.success('Ready to scan next code');
+      return;
+    }
+
     if (onComplete) {
       onComplete();
     } else {
@@ -416,7 +526,7 @@ export const UniversalFountainScanner = ({
                   onClick={handleComplete}
                   className="w-full"
                 >
-                  Continue to App
+                  {stayOnScannerAfterComplete ? 'Scan Another' : 'Continue to App'}
                 </Button>
 
                 <Button

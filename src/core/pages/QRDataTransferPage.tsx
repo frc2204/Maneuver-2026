@@ -132,8 +132,8 @@ const QRDataTransferPage = () => {
             return;
         }
 
-        // No conflicts - success, go back to select
-        setMode('select');
+        // No conflicts - remain in scanner so leads can scan multiple in succession
+        return;
     }, [setCurrentConflicts, setCurrentConflictIndex, setConflictResolutions, setShowConflictDialog]);
 
     // Configuration for each data type
@@ -376,6 +376,7 @@ const QRDataTransferPage = () => {
                     title={config.title}
                     description={config.description}
                     completionMessage={config.completionMessage}
+                    stayOnScannerAfterComplete={dataType === 'scouting' || dataType === 'pit-scouting'}
                 />
 
                 {/* Conflict Resolution Dialogs */}

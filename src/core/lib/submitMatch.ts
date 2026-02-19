@@ -9,6 +9,7 @@ import { db } from '@/core/db/database';
 import { clearScoutingLocalStorage } from '@/core/lib/utils';
 import { toast } from 'sonner';
 import type { DataTransformation } from '@/types';
+import type { ScoutingEntryBase } from '@/core/types/scouting-entry';
 
 interface MatchInputs {
     eventKey: string;
@@ -31,6 +32,8 @@ interface SubmitOptions {
     noShow?: boolean;
     /** Callback on successful submission */
     onSuccess?: () => void;
+    /** Callback with the saved entry (for post-submit workflows like QR display) */
+    onEntrySaved?: (entry: ScoutingEntryBase<Record<string, unknown>>) => void;
     /** Callback on error */
     onError?: (error: Error) => void;
 }
@@ -86,6 +89,7 @@ export async function submitMatchData({
     comment = '',
     noShow = false,
     onSuccess,
+    onEntrySaved,
     onError,
 }: SubmitOptions): Promise<boolean> {
     try {
@@ -97,7 +101,7 @@ export async function submitMatchData({
 
         // For no-show, skip data collection and submit minimal entry
         if (noShow) {
-            const entry: Record<string, unknown> = {
+            const entry: ScoutingEntryBase<Record<string, unknown>> = {
                 id: `${inputs.eventKey}::${matchKey}::${inputs.selectTeam}::${inputs.alliance}`,
                 scoutName: inputs.scoutName || '',
                 teamNumber: parseInt(inputs.selectTeam) || 0,
@@ -116,6 +120,7 @@ export async function submitMatchData({
             };
 
             await db.scoutingData.put(entry as never);
+            onEntrySaved?.(entry);
             toast.success('No-show match submitted');
             clearScoutingLocalStorage();
             
@@ -143,7 +148,7 @@ export async function submitMatchData({
         });
 
         // Create the scouting entry
-        const scoutingEntry: Record<string, unknown> = {
+        const scoutingEntry: ScoutingEntryBase<Record<string, unknown>> = {
             id: `${inputs.eventKey}::${matchKey}::${inputs.selectTeam}::${inputs.alliance}`,
             scoutName: inputs.scoutName || '',
             teamNumber: parseInt(inputs.selectTeam) || 0,
@@ -158,6 +163,7 @@ export async function submitMatchData({
 
         // Save to database
         await db.scoutingData.put(scoutingEntry as never);
+        onEntrySaved?.(scoutingEntry);
 
         // Clear action stacks and robot status
         clearScoutingLocalStorage();
