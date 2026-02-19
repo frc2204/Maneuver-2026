@@ -61,9 +61,9 @@ export function ScoutOptionsSheet({
                 className="mt-0.5"
               />
               <div>
-                <p className="text-sm font-medium">Show QR after submit</p>
+                <p className="text-sm font-medium">Placeholder option A</p>
                 <p className="text-xs text-muted-foreground">
-                  Show a single-match transfer QR modal immediately after successful submission.
+                  Reserved for future core-level configuration. Implement real behavior in game repos.
                 </p>
               </div>
             </label>

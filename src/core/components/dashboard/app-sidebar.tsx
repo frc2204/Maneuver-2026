@@ -61,10 +61,6 @@ const data = {
         {
           title: "API Data",
           url: "/api-data",
-        },
-        {
-          title: "View Data",
-          url: "/view-data",
         }
       ]
     },

@@ -11,9 +11,6 @@ import { useGame } from "@/core/contexts/GameContext";
 import { useWorkflowNavigation } from "@/core/hooks/useWorkflowNavigation";
 import { submitMatchData } from "@/core/lib/submitMatch";
 import { workflowConfig } from "@/game-template/game-schema";
-import { CORE_SCOUT_OPTION_KEYS } from "@/core/components/GameStartComponents/ScoutOptionsSheet";
-import { MatchTransferQrModal } from "@/core/components/data-transfer/MatchTransferQr";
-import type { ScoutingEntryBase } from "@/core/types/scouting-entry";
 
 const EndgamePage = () => {
   const { ui, transformation } = useGame();
@@ -28,11 +25,6 @@ const EndgamePage = () => {
     return saved ? JSON.parse(saved) : {};
   });
   const [comment, setComment] = useState("");
-  const [postSubmitQrEntry, setPostSubmitQrEntry] = useState<ScoutingEntryBase<Record<string, unknown>> | null>(null);
-  const [showPostSubmitQrModal, setShowPostSubmitQrModal] = useState(false);
-
-  const shouldShowPostSubmitQr =
-    states?.inputs?.scoutOptions?.[CORE_SCOUT_OPTION_KEYS.placeholderOptionA] === true;
 
   const updateRobotStatus = (updates: Partial<any>) => {
     setRobotStatus((prev: any) => {
@@ -51,17 +43,7 @@ const EndgamePage = () => {
       inputs: states?.inputs,
       transformation,
       comment,
-      onSuccess: () => {
-        if (!shouldShowPostSubmitQr) {
-          navigate('/game-start');
-        }
-      },
-      onEntrySaved: (entry) => {
-        if (shouldShowPostSubmitQr) {
-          setPostSubmitQrEntry(entry);
-          setShowPostSubmitQrModal(true);
-        }
-      },
+      onSuccess: () => navigate('/game-start'),
     });
   };
 
@@ -79,19 +61,7 @@ const EndgamePage = () => {
   };
 
   return (
-    <>
-      <MatchTransferQrModal
-        open={showPostSubmitQrModal}
-        onOpenChange={(open) => {
-          setShowPostSubmitQrModal(open);
-          if (!open) {
-            navigate('/game-start');
-          }
-        }}
-        entry={postSubmitQrEntry}
-      />
-
-      <div className="h-full w-full flex flex-col items-center px-4 pt-12 pb-24">
+    <div className="h-full w-full flex flex-col items-center px-4 pt-12 pb-24">
       <div className="w-full max-w-2xl">
         <h1 className="text-2xl font-bold pb-4">Endgame</h1>
       </div>
@@ -201,7 +171,6 @@ const EndgamePage = () => {
         </div>
       </div>
     </div>
-    </>
   );
 };
 
