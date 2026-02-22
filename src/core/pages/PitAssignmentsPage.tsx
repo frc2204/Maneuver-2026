@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/core/components/animate-ui/radix/tabs";
 import { AlertCircle, Users, BarChart3 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/core/components/ui/alert";
 import { useScoutManagement } from '@/core/hooks/useScoutManagement';
+import { useWebRTC } from '@/core/contexts/WebRTCContext';
 import { getAllStoredEventTeams } from '@/core/lib/tbaUtils';
 import { getStoredNexusTeams, getStoredPitAddresses, getStoredPitData } from '@/core/lib/nexusUtils';
 import { loadPitScoutingEntry } from '@/core/lib/pitScoutingUtils';
@@ -14,9 +15,12 @@ import AssignmentControlsCard from '@/core/components/pit-assignments/Assignment
 import { DataAttribution } from '@/core/components/DataAttribution';
 import type { PitAssignment } from '@/core/lib/pitAssignmentTypes';
 import type { NexusPitMap } from '@/core/lib/nexusUtils';
+import type { PitAssignmentTransferPayload } from '@/core/lib/pitAssignmentTransfer';
+import { toast } from 'sonner';
 
 const PitAssignmentsPage: React.FC = () => {
   const { scoutsList } = useScoutManagement();
+  const { connectedScouts, pushDataToAll } = useWebRTC();
   const [selectedEvent, setSelectedEvent] = useState<string>('');
   const [currentTeams, setCurrentTeams] = useState<number[]>([]);
   const [teamDataSource, setTeamDataSource] = useState<'nexus' | 'tba' | null>(null);
@@ -27,6 +31,24 @@ const PitAssignmentsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('teams');
   const [selectedScoutForAssignment, setSelectedScoutForAssignment] = useState<string | null>(null);
   const [assignmentsConfirmed, setAssignmentsConfirmed] = useState<boolean>(false);
+
+  const readyConnectedScoutsCount = useMemo(() => {
+    return connectedScouts.filter((scout) => {
+      const channelState = scout.channel?.readyState || scout.dataChannel?.readyState;
+      return scout.status === 'connected' && channelState === 'open';
+    }).length;
+  }, [connectedScouts]);
+
+  const availableScouts = useMemo(() => {
+    const activeConnectedScoutNames = connectedScouts
+      .filter((scout) => scout.status !== 'disconnected')
+      .map((scout) => scout.name.trim())
+      .filter((name) => name.length > 0);
+
+    return Array.from(new Set([...scoutsList, ...activeConnectedScoutNames])).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [scoutsList, connectedScouts]);
 
   // Save assignments to localStorage whenever they change
   useEffect(() => {
@@ -254,7 +276,7 @@ const PitAssignmentsPage: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [selectedEvent, assignments, hasRunInitialPitCheck]);
 
-  const hasValidData = currentTeams.length > 0 && scoutsList.length > 0;
+  const hasValidData = currentTeams.length > 0 && availableScouts.length > 0;
   const hasAssignments = assignments.length > 0;
 
   const handleAssignmentModeChange = (mode: 'sequential' | 'spatial' | 'manual') => {
@@ -349,6 +371,34 @@ const PitAssignmentsPage: React.FC = () => {
     ));
   };
 
+  const handlePushAssignments = () => {
+    if (!selectedEvent) {
+      toast.error('No active event selected');
+      return;
+    }
+
+    if (assignments.length === 0) {
+      toast.error('Generate or create assignments first');
+      return;
+    }
+
+    if (readyConnectedScoutsCount === 0) {
+      toast.error('No connected scouts available to receive assignments');
+      return;
+    }
+
+    const sourceScoutName = localStorage.getItem('currentScout') || 'Lead Scout';
+    const payload: PitAssignmentTransferPayload = {
+      eventKey: selectedEvent,
+      sourceScoutName,
+      generatedAt: Date.now(),
+      assignments,
+    };
+
+    pushDataToAll(payload, 'pit-assignments');
+    toast.success(`Pushed pit assignments to ${readyConnectedScoutsCount} connected scout${readyConnectedScoutsCount === 1 ? '' : 's'}`);
+  };
+
   return (
     <div className="min-h-screen container mx-auto px-4 pt-12 pb-24 space-y-6 max-w-7xl">
       <div className="text-start">
@@ -397,9 +447,11 @@ const PitAssignmentsPage: React.FC = () => {
             pitMapData={pitMapData}
             pitAddresses={pitAddresses}
             currentTeams={currentTeams}
-            scoutsList={scoutsList}
+            scoutsList={availableScouts}
             selectedEvent={selectedEvent}
             hasAssignments={hasAssignments}
+            readyConnectedScoutsCount={readyConnectedScoutsCount}
+            onPushAssignments={handlePushAssignments}
             onAssignmentModeChange={handleAssignmentModeChange}
             onAssignmentsGenerated={handleAssignmentsGenerated}
           />
@@ -431,7 +483,7 @@ const PitAssignmentsPage: React.FC = () => {
                 eventKey={selectedEvent}
                 teams={currentTeams}
                 assignments={assignments}
-                scoutsList={scoutsList}
+                scoutsList={availableScouts}
                 onToggleCompleted={handleToggleCompleted}
                 assignmentMode={assignmentMode}
                 onManualAssignment={handleManualAssignment}
@@ -455,7 +507,7 @@ const PitAssignmentsPage: React.FC = () => {
                 onToggleCompleted={handleToggleCompleted}
                 onClearAllAssignments={handleClearAssignments}
                 assignmentMode={assignmentMode}
-                scoutsList={scoutsList}
+                scoutsList={availableScouts}
                 onManualAssignment={handleManualAssignment}
                 onRemoveAssignment={handleRemoveAssignment}
                 selectedScoutForAssignment={selectedScoutForAssignment}
@@ -476,7 +528,7 @@ const PitAssignmentsPage: React.FC = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {currentTeams.length === 0 && "No team data found. Please load demo data from the home page or import teams from the TBA Data page."}
-            {scoutsList.length === 0 && " Please add scouts to create assignments."}
+            {availableScouts.length === 0 && " Please add scouts or connect scouts over WiFi to create assignments."}
           </AlertDescription>
         </Alert>
       )}

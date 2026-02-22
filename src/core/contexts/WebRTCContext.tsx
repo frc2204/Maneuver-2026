@@ -53,8 +53,21 @@ const STUN_SERVERS: RTCIceServer[] = [
   },
 ];
 
+const safeStringify = (value: unknown): string => {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(value, (_key, currentValue) => {
+    if (typeof currentValue === 'object' && currentValue !== null) {
+      if (seen.has(currentValue)) {
+        return '[Circular]';
+      }
+      seen.add(currentValue);
+    }
+    return currentValue;
+  });
+};
+
 // Data types that can be transferred
-export type TransferDataType = 'scouting' | 'pit-scouting' | 'match' | 'scout' | 'combined';
+export type TransferDataType = 'scouting' | 'pit-scouting' | 'pit-assignments' | 'match' | 'scout' | 'combined';
 
 // Types
 export interface ConnectedScout {
@@ -249,7 +262,8 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
   const displayName = mode === 'lead' ? 'Lead Scout' : (() => {
     const scoutName = typeof window !== 'undefined' ? localStorage.getItem('currentScout') : null;
     const playerStation = typeof window !== 'undefined' ? localStorage.getItem('playerStation') : null;
-    return scoutName && playerStation ? `${scoutName} (${playerStation})` : 'Scout';
+    if (!scoutName) return 'Scout';
+    return playerStation ? `${scoutName} (${playerStation})` : scoutName;
   })();
 
   // Update state when ref changes
@@ -568,7 +582,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
   const pushDataToAll = useCallback((data: unknown, dataType: TransferDataType) => {
     console.log(`📤 Pushing ${dataType} data to ${connectedScoutsRef.current.length} scouts...`);
     
-    const dataString = JSON.stringify({ 
+    const dataString = safeStringify({ 
       type: 'push-data',
       dataType,
       data
@@ -614,7 +628,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
 
     console.log(`📤 Pushing ${dataType} data to ${scout.name}...`);
     
-    const dataString = JSON.stringify({ 
+    const dataString = safeStringify({ 
       type: 'push-data',
       dataType,
       data
@@ -845,7 +859,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const dataString = JSON.stringify(data);
+      const dataString = safeStringify(data);
       const CHUNK_SIZE = 15000; // 15KB chunks to leave room for JSON wrapper overhead
       
       console.log(`📤 Scout sending ${dataType || 'data'}, size: ${dataString.length} chars`);

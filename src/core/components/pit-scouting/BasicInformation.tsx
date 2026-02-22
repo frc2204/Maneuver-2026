@@ -2,8 +2,9 @@ import { Label } from "@/core/components/ui/label";
 import { Input } from "@/core/components/ui/input";
 import { Button } from "@/core/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card";
+import { Badge } from "@/core/components/ui/badge";
 import { EventNameSelector } from "@/core/components/GameStartComponents/EventNameSelector";
-import { User, Hash, Calendar, FolderOpen } from "lucide-react";
+import { User, Hash, Calendar, FolderOpen, ClipboardList } from "lucide-react";
 
 interface BasicInformationProps {
   teamNumber: number | "";
@@ -14,6 +15,9 @@ interface BasicInformationProps {
   onScoutNameChange: (value: string) => void;
   onLoadExisting?: () => void;
   isLoading?: boolean;
+  onOpenAssignedTeams?: () => void;
+  assignedTeamsCount?: number;
+  completedAssignedCount?: number;
 }
 
 export function BasicInformation({
@@ -25,6 +29,9 @@ export function BasicInformation({
   onScoutNameChange,
   onLoadExisting,
   isLoading = false,
+  onOpenAssignedTeams,
+  assignedTeamsCount = 0,
+  completedAssignedCount = 0,
 }: BasicInformationProps) {
   const handleTeamNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -48,17 +55,39 @@ export function BasicInformation({
             <User className="h-5 w-5" />
             Basic Information
           </CardTitle>
-          {onLoadExisting && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onLoadExisting}
-              disabled={isLoading || !canLoadExisting}
-            >
-              <FolderOpen className="h-4 w-4 mr-2" />
-              Load Existing
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {onOpenAssignedTeams && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onOpenAssignedTeams}
+                className="gap-2"
+                aria-label="Open assigned teams"
+                title="Open assigned teams"
+              >
+                <ClipboardList className="h-4 w-4" />
+                <span className="hidden sm:inline">Assigned Teams</span>
+                <Badge variant="secondary" className="inline-flex tabular-nums">
+                  {completedAssignedCount}/{assignedTeamsCount}
+                </Badge>
+              </Button>
+            )}
+
+            {onLoadExisting && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadExisting}
+                disabled={isLoading || !canLoadExisting}
+                className="gap-2"
+                aria-label="Load existing"
+                title="Load existing"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Load Existing</span>
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

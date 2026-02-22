@@ -8,6 +8,7 @@ import { Badge } from '@/core/components/ui/badge';
 import { AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TransferDataType } from '@/core/contexts/WebRTCContext';
+import { buildPitAssignmentsTransferPayload } from '@/core/lib/pitAssignmentTransfer';
 import { debugLog } from '@/core/lib/peerTransferUtils';
 
 interface ReceivedDataEntry {
@@ -76,6 +77,17 @@ export function ConnectedScoutCard({
                         version: '3.0-maneuver-core',
                         exportedAt: Date.now()
                     };
+                    break;
+                }
+                case 'pit-assignments': {
+                    const eventKey = localStorage.getItem('eventKey') || localStorage.getItem('eventName') || '';
+                    const sourceScoutName = localStorage.getItem('currentScout') || 'Lead Scout';
+
+                    if (!eventKey) {
+                        throw new Error('No active event found for pit assignment transfer');
+                    }
+
+                    data = buildPitAssignmentsTransferPayload(eventKey, sourceScoutName);
                     break;
                 }
                 case 'match': {
