@@ -194,7 +194,7 @@ function App() {
             <HomePage 
               logo={logo} 
               appName="Maneuver 2026"
-              version="2026.0.6"
+              version="2026.0.7"
               onLoadDemoData={loadDemoData}
               onLoadDemoScheduleOnly={loadDemoScheduleOnly}
               onClearData={clearDemoData}
