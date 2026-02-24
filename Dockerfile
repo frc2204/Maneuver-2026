@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies (cached layer)
 COPY package.json bun.lock* package-lock.json* ./
-RUN bun install
+RUN bun install --ignore-scripts
 
 # Copy source and build
 COPY . .
