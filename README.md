@@ -125,6 +125,28 @@ npm run dev
 npm run build
 ```
 
+### Using Docker
+
+```bash
+# Clone the repository
+git clone [url]
+cd Maneuver-2026
+
+# Create .env and add your API keys
+cp .env.example .env
+
+# Start the container
+docker compose up -d
+
+# The app is now running at http://localhost:3000
+```
+
+To rebuild after pulling changes:
+
+```bash
+docker compose up -d --build
+```
+
 ### For Your Team
 
 If you want to customize this for your team:
