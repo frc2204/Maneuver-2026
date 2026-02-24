@@ -14,7 +14,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "server": "bun run server/index.ts",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up",
+    "docker:down": "docker compose down"
   },
   "keywords": [
     "frc",
@@ -102,6 +106,7 @@
     "@types/react-dom": "^18.3.1",
     "@types/simple-peer": "^9.11.8",
     "@vitejs/plugin-react-swc": "^3.7.1",
+    "bun-types": "^1.3.9",
     "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",

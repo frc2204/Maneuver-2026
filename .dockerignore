@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+.git
+.gitignore
+.env
+.env*.local
+.netlify
+.vscode
+.idea
+.agent
+docs
+coverage
+*.md
+*.pem
+.DS_Store
+Thumbs.db
