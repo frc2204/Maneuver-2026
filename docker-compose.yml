@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - PORT=3000
       - TBA_API_KEY=${TBA_API_KEY:-}
