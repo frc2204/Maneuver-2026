@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      shm_size: 256m
+    image: ghcr.io/frc2204/maneuver-2026:latest
     mem_limit: 1g
     memswap_limit: 1g
     cpus: 1

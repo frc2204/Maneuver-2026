@@ -125,27 +125,57 @@ npm run dev
 npm run build
 ```
 
-### Using Docker
+### Self-Hosted Deployment (Docker)
+
+The Docker image is automatically built and pushed to GitHub Container Registry on every push to `main` via GitHub Actions. No need to build locally.
+
+#### 1. Get API Keys
+
+| Key | Where to get it | Required? |
+|-----|----------------|-----------|
+| TBA API Key | [thebluealliance.com/account](https://www.thebluealliance.com/account) | Yes |
+| Nexus API Key | [frc.nexus](https://frc.nexus/) | Optional |
+
+#### 2. Create a `.env` file on your server
+
+```env
+TBA_API_KEY=your_tba_api_key_here
+NEXUS_API_KEY=your_nexus_api_key_here
+```
+
+#### 3. Create a `docker-compose.yml`
+
+```yaml
+services:
+  app:
+    image: ghcr.io/frc2204/maneuver-2026:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - TBA_API_KEY=${TBA_API_KEY:-}
+      - NEXUS_API_KEY=${NEXUS_API_KEY:-}
+    restart: unless-stopped
+```
+
+#### 4. Start it
 
 ```bash
-# Clone the repository
-git clone [url]
-cd Maneuver-2026
-
-# Create .env and add your API keys
-cp .env.example .env
-
-# Start the container
 docker compose up -d
-
-# The app is now running at http://localhost:3000
 ```
 
-To rebuild after pulling changes:
+The app is now running at `http://localhost:3000`.
+
+#### Updating
+
+Pull the latest image and restart:
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
+
+> **Note:** If the GHCR package is private, you'll need to authenticate Docker first:
+> 1. Create a GitHub Personal Access Token (PAT) at [github.com/settings/tokens](https://github.com/settings/tokens) with the `read:packages` scope
+> 2. Run: `echo YOUR_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin`
 
 ### For Your Team
 
